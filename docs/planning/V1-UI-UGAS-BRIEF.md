@@ -14,22 +14,28 @@ Technological, elegant, premium, controlled, precise. Glassmorphism with strong 
 - glass card treatment;
 - chart/market visualization language;
 - strategy-card visuals;
-- loading/empty/error/success states;
+- animated KPI/motion language;
+- order lifecycle animation language;
+- loading/skeleton/empty/error/success/stale states;
 - admin visual language;
 - future landing-page starter assets.
 
 ## Core screens to design
 1. Sign-in/onboarding shell (future SaaS-ready).
-2. Overview dashboard.
+2. Overview / Performance Dashboard.
 3. Market Scanner.
 4. Strategy Selection.
 5. Strategy Detail.
 6. Orders / Positions.
 7. History & Analytics.
-8. Risk Center.
-9. Settings.
-10. Admin Panel.
-11. System Health / Audit.
+8. Reports / Export.
+9. Risk Center.
+10. Settings.
+11. Admin Panel.
+12. System Health / Audit.
+
+## Dashboard design requirement
+The dashboard must feel like the product's command center. It needs dense but readable KPI cards, interactive charts, date-range filters, drill-downs, recent activity, risk state, scanner state and performance analytics. Motion is allowed and encouraged when subtle and informative.
 
 ## UX rule
 Beauty must never obscure trading state. Payout, selected strategy, expiry, risk status, demo/live state, stop conditions and order state must be immediately legible.
