@@ -15,3 +15,8 @@ Status: PLANNING / DT-PLAN-0001.
 - Each strategy must show: canonical name, short plain-language summary, market conditions it follows, entry trigger family, supported expiry windows, and important limitations.
 - Strategy selection must be explicit and user-controlled. The engine must not silently combine the five strategies into a mandatory confluence score.
 - Risk and broker eligibility gates remain global and may block an order even when the selected strategy emits a valid signal.
+- The user dashboard must be a complete performance center with charts, motion, KPI summaries, operational state and drill-down.
+- Reporting must support today, 2d, 7d, 15d, 30d and custom date ranges.
+- The user must be able to see total invested, amount per order, total orders, wins/losses, win rate, PnL, drawdown, payout and strategy/instrument/expiry breakdowns.
+- V1 reporting must support exportable PDF summary and CSV detail.
+- Analytics must use reconciled canonical records and expose stale/unreconciled state instead of silently presenting uncertain numbers.
