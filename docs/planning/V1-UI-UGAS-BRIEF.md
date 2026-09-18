@@ -3,30 +3,52 @@
 All original Deriv Trader visual identity/assets are produced through UGAS.
 
 ## Direction
-Technological, elegant, premium, controlled and precise. Dark-first glassmorphism, restrained depth, fine borders, soft blur and dense but readable information.
+Technological, elegant, premium, controlled and precise.
+Dark-first glassmorphism with:
+- restrained blur;
+- fine borders;
+- strong hierarchy;
+- high data density without clutter;
+- subtle depth;
+- accessibility-safe contrast;
+- purposeful motion.
 
-## Required UGAS deliverables
-Logo system, palette, typography, icon language, background/texture system, glass cards, charts, strategy cards, Runner status language, slot-cap visualizations, motion language, order lifecycle animations, skeleton/empty/error/stale states, admin visual language and landing-page starter assets.
+Avoid casino-like visual language, excessive flashing, fake urgency and ornamental noise.
+
+## Product shell
+Persistent desktop sidebar + top operational status bar.
+Critical state is globally visible:
+- environment;
+- Deriv connection;
+- worker health;
+- active Runners;
+- slot usage;
+- risk state;
+- daily PnL;
+- Stop All/Kill access.
 
 ## Core screens
-1. Sign-in/onboarding shell
-2. Overview / Performance Dashboard
-3. Market Scanner
+1. Authentication/onboarding
+2. Dashboard
+3. Scanner
 4. Strategy Control Center
 5. Strategy Detail
-6. Orders / Positions
-7. History & Analytics
+6. Orders / Reconciliation
+7. Analytics
 8. Reports / Export
 9. Risk Center
-10. Settings
-11. Admin Panel
+10. Settings / Connections
+11. Admin
 12. System Health / Audit
 
 ## Strategy Control Center
-Must visually support multiple strategy-expiry Runners at once. The user can see five strategy cards, toggle 1m/3m/5m profiles, select several combinations, Start All, Stop All and inspect each Runner state.
+Five premium strategy cards, each with validated 1m/3m/5m Runner controls and live state.
 
 ## Dashboard
-Must show active Runners, slot usage and performance without visual overload.
+Complete performance/operations command center with KPI cards, interactive charts, Runner state, slot usage, orders and alerts.
+
+## Required UGAS deliverables
+Brand system, tokens, typography, icon language, glass system, chart language, strategy icons, Runner states, scanner/radar motif, risk visuals, loading/empty/stale/error states and motion specs.
 
 ## UX rule
-Beauty never obscures environment, Runner state, payout, stake, expiry, risk, slot usage, stop conditions or order state.
+Beauty never obscures environment, payout, strategy/Runner state, stake, expiry, risk, slots, order state or staleness.

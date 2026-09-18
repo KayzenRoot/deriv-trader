@@ -3,17 +3,19 @@ Status: COLLECTING
 Planning base: DT-CP-0003
 Scope class: product/system planning only.
 
-Data architecture planning now includes:
-- strict operational vs research data separation;
-- local Parquet capture for high-frequency ticks/proposals/execution evidence;
-- DuckDB analytical/query layer;
-- Dataset Passport manifests;
-- Data Quality Gate;
-- retention/compaction/recovery policies;
-- data test matrix;
-- free-first protection against filling Supabase with raw market streams.
+Latest planning block completes the V1 UX/navigation and UGAS production contract:
+- primary sitemap;
+- desktop application shell;
+- universal/trading UX state model;
+- responsive/mobile/accessibility contract;
+- UGAS asset production contract;
+- critical operator journeys;
+- global Stop All/Kill accessibility;
+- authoritative worker-state UX semantics.
 
-A planning runway now records the explicit user requirement to warn on the final planning response before the first development prompt.
+The product remains desktop-first but monitorable/controllable from mobile for critical actions.
+
+No asset is claimed as UGAS-produced until the actual UGAS workflow generates/approves it.
 
 No infrastructure provisioned, credentials handled or trading performed.
-Pending: UX/admin/security/alerts final passes, architecture version freeze, acceptance consistency, Hive sequencing, final planning audit/PR/checkpoint.
+Pending: admin/security/permissions, notifications/alerts/operator ergonomics, architecture freeze, acceptance consistency, Hive sequencing and final planning audit/PR/checkpoint.

@@ -2,8 +2,10 @@
 
 User instruction: explicitly warn on the final planning response immediately before the first development prompt is generated.
 
+## Completed
+1. Final UX/navigation + UGAS asset production contract. ✅
+
 ## Remaining planning blocks
-1. Final UX/navigation + UGAS asset production contract.
 2. Admin/security/permissions final pass.
 3. Notifications/alerts and operator ergonomics.
 4. DT-ARCH-0001 stack/version freeze and module dependency audit.
