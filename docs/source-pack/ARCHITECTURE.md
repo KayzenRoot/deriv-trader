@@ -7,35 +7,43 @@ LOCAL-FIRST, FREE-FIRST, HIGH_ASSURANCE.
 
 ## Core components
 1. Next.js/React Operator + Admin UI
-2. Local Node.js Trader Worker
-3. Deriv API Adapter
-4. Shared Market Data / Eligibility / Proposal Cache
-5. Payout Pulse Scheduler
-6. Multi-Runner Strategy Runtime
-7. Global Risk Engine + Order Slot Arbiter + Loss Cascade Brake
-8. Demo Execution + Reconciliation
-9. Order Flight Recorder / Audit
-10. PostgreSQL Operational Store
-11. DuckDB + Parquet Research Store
-12. Quant Lab / Backtest Replay
-13. Reporting / Analytics
+2. Supabase Auth identity/session layer
+3. Per-user Deriv Connection Manager
+4. SecretStore abstraction
+5. Local Node.js Trader Worker
+6. Deriv API Adapter
+7. Shared Market Data / Eligibility / Proposal Cache
+8. Payout Pulse Scheduler
+9. Multi-Runner Strategy Runtime
+10. Global Risk Engine + Order Slot Arbiter + Loss Cascade Brake
+11. Demo Execution + Reconciliation
+12. Order Flight Recorder / Audit
+13. PostgreSQL Operational Store
+14. DuckDB + Parquet Research Store
+15. Quant Lab / Backtest Replay
+16. Reporting / Analytics
+
+## Identity boundary
+Supabase Auth answers: who is the Deriv Trader user?
+Deriv connection answers: which Deriv account/API authority has that user connected?
+These are separate and independently revocable.
+
+## Secrets
+Local V1: OS credential-store SecretStore adapter.
+Hosted future: encrypted server-side SecretStore such as Supabase Vault/KMS-equivalent.
+Operational DB stores secret references/metadata only.
 
 Execution path:
-Deriv market data -> shared normalized cache -> eligible universe/payout -> independent active Runner -> Edge Gate -> Global Risk/Slot Gate -> final proposal refresh -> demo execution or skip -> reconciliation -> audit/reporting.
+authenticated user -> selected Deriv connection -> Deriv market data -> eligible universe/payout -> active Runner -> Edge Gate -> Global Risk/Slot Gate -> final proposal refresh -> demo execution or skip -> reconciliation -> audit/reporting.
 
-## Data placement
-Operational/config/user/order summaries: PostgreSQL/Supabase-compatible.
-High-frequency raw ticks/proposals/research files: local Parquet + DuckDB.
-Hot market/Runner state: bounded in-process memory in V1.
-
-Redis is not mandatory in V1.
-
-## Cloud
-Supabase Free is the preferred early operational cloud database/auth foundation.
-Vercel Hobby may host personal/non-commercial UI previews only under current terms.
-Trading-critical compute remains local in V1.
+## Cloud/data
+Supabase Free: operational Postgres + Auth.
+High-frequency data: local Parquet + DuckDB.
+Hot state: bounded in-process memory.
+Redis not mandatory.
+Vercel Hobby: personal/non-commercial preview only.
 
 Governance: GEF.
 Context: Hive when healthy.
 Canonical truth: Git + exact-head evidence.
-LLMs have no order-time decision authority.
+LLMs have no order-time authority.

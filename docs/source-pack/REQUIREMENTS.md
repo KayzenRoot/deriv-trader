@@ -2,19 +2,22 @@
 Status: PLANNING / DT-PLAN-0001.
 - Prefer official/documented APIs for production paths.
 - Demo/paper before live money.
+- Supabase Auth provides Deriv Trader user identity in V1.
+- User identity and Deriv broker credentials are separate security domains.
+- Each authenticated user configures their own Deriv connection in Settings.
+- Local V1 supports PAT + Deriv App ID connection and safe validation.
+- Hosted SaaS/web path should prefer Deriv OAuth 2.0 + PKCE when implemented from current official docs.
+- PAT/OAuth tokens must never be exposed after save, logged, or stored plaintext in ordinary user/config tables.
+- Broker secrets use a SecretStore abstraction with local OS credential-store and future encrypted hosted adapters.
+- RLS ensures users can only access their own connection metadata/configuration.
+- Least-privilege Deriv scopes are mandatory.
+- A connected real account does not enable real-money execution without the explicit HIGH_ASSURANCE go-live gate.
 - Reproducible data/backtests with provenance.
 - Walk-forward and strict out-of-sample evaluation.
 - Payout-aware expected value.
-- Multiple concurrent Strategy Runners are supported; each Runner is one strategy + one expiry.
-- No mandatory cross-strategy confluence.
+- Multiple concurrent Strategy Runners are supported.
 - Global Risk Engine arbitrates all Runner signals.
-- User configures fixed stake, max stake, max simultaneous orders, max open exposure, max orders per instrument, daily max loss, optional daily target, max consecutive losses, cooldowns and operating windows.
-- Risk state and hard-stop transitions must be atomic relative to order admission.
-- Loss Cascade Brake may throttle/pause clustered-loss conditions without altering strategy direction.
-- No stale blocked signal may be blindly queued and executed later.
 - Complete decision/execution/risk audit trail is mandatory.
 - No committed secrets.
 - Exact-head evidence binding.
-- Dashboard must expose risk state, slot usage, open exposure, drawdown and risk-block reasons.
-- Reporting must attribute results to exact Runner and support today, 2d, 7d, 15d, 30d and custom periods.
 - Live-money remains outside V1 acceptance.

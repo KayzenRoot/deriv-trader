@@ -15,6 +15,11 @@ ADR-0013 ACCEPTED: duplicate identical Runners are prevented.
 ADR-0014 ACCEPTED: V1 architecture is LOCAL-FIRST and FREE-FIRST. Trading-critical compute remains local during V1 research/demo.
 ADR-0015 ACCEPTED: Supabase Free is the preferred early operational Postgres/Auth cloud foundation, subject to re-checking current quotas before deployment.
 ADR-0016 ACCEPTED: high-frequency tick/proposal research data stays out of the small cloud operational DB and uses local Parquet + DuckDB in V1.
-ADR-0017 ACCEPTED: Redis is not mandatory in V1; bounded in-process state plus durable DB/event patterns are preferred until distributed runtime proves a need.
-ADR-0018 ACCEPTED: Vercel Hobby is development/preview only because current terms restrict Hobby to personal/non-commercial use. Commercial hosting requires a later eligible target/plan.
-ADR-0019 ACCEPTED: recurring infrastructure spend targets $0 during V1 development; any paid/overage-capable service requires explicit governance/user approval.
+ADR-0017 ACCEPTED: Redis is not mandatory in V1.
+ADR-0018 ACCEPTED: Vercel Hobby is development/preview only under current terms.
+ADR-0019 ACCEPTED: recurring infrastructure spend targets $0 during V1 development.
+ADR-0020 ACCEPTED: Supabase Auth is the V1 identity provider. Privy is not selected because V1 does not need embedded-wallet infrastructure and its current free MAU tier is much smaller.
+ADR-0021 ACCEPTED: Deriv Trader identity and Deriv broker authentication are separate. Every logged-in user owns their own Deriv connection configuration.
+ADR-0022 ACCEPTED: local V1 prefers user-supplied Deriv PAT + App ID stored in the local OS credential store; hosted web/SaaS prefers Deriv OAuth 2.0 + PKCE when the current documented token lifecycle is suitable.
+ADR-0023 ACCEPTED: broker secrets are accessed only through a SecretStore abstraction. Plaintext tokens are never stored in normal operational tables or returned to the browser after save.
+ADR-0024 ACCEPTED: connecting a real Deriv account never bypasses the project REAL execution gate.

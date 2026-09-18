@@ -1,12 +1,15 @@
 # V1 Stack Selection
 
 ## Monorepo
-Use one TypeScript monorepo with npm workspaces for minimal tooling overhead and alignment with the existing GEF/Node environment.
+TypeScript monorepo with npm workspaces.
 
 Proposed layout:
 - apps/web
 - apps/trader
 - packages/domain
+- packages/auth
+- packages/connections
+- packages/secret-store
 - packages/deriv-adapter
 - packages/strategies
 - packages/risk
@@ -18,65 +21,41 @@ Proposed layout:
 - packages/testing
 
 ## Web
-Next.js + React + TypeScript.
-Why: fast dashboard/admin development, strong ecosystem, Vercel preview compatibility and future SaaS readiness.
+Next.js + React + TypeScript + Tailwind + UGAS design assets/tokens + Motion + open-source charting.
 
-UI:
-- Tailwind CSS;
-- UGAS-generated design tokens/assets;
-- Motion-class animation;
-- open-source charting;
-- responsive dark-first glassmorphism.
+## Identity
+Supabase Auth.
+Initial login: email/password or magic link/OTP.
+Optional Google/social login can be enabled later without replacing the identity layer.
 
-Admin lives in the same app behind role routes in V1. Do not build a second admin application.
+Why not Privy in V1:
+- no need for embedded wallets/onchain signing;
+- Supabase is already the DB platform;
+- current Supabase Free Auth allowance is much larger than Privy's current free MAU tier.
+
+## Deriv connection
+Local: PAT + Deriv App ID configured by logged-in user in Settings.
+Future web/SaaS: OAuth 2.0 + PKCE preferred when token lifecycle is implemented from then-current official docs.
+
+## Secret storage
+SecretStore interface.
+- local adapter: Windows Credential Manager / OS keychain-class store;
+- hosted adapter: Supabase Vault or equivalent server-side encrypted store.
+Browser never receives stored secret after initial submission.
 
 ## Trader worker
-Node.js + TypeScript persistent process.
-Responsibilities:
-- Deriv sockets;
-- market normalization;
-- Scanner;
-- Runners;
-- Risk Engine;
-- execution/reconciliation;
-- event/audit emission.
-
-A lightweight Fastify-class server exposes local HTTP/WebSocket/SSE interfaces to the dashboard.
+Persistent local Node.js + TypeScript process for Deriv sockets, Scanner, Runners, Risk, execution/reconciliation and audit.
 
 ## Database
-PostgreSQL.
-Early cloud option: Supabase Free.
-Data access: lightweight typed SQL/ORM selected at implementation (Drizzle-class preferred candidate) with migrations committed to Git.
+PostgreSQL / Supabase Free for operational data and connection metadata.
+Typed migration/data layer selected in DT-ARCH-0001.
 
 ## Research
-DuckDB + Parquet locally.
-Reasons:
-- no service bill;
-- columnar compression;
-- efficient backtests/analytics;
-- easy dataset snapshots/hashes;
-- avoids filling Supabase with raw ticks.
+DuckDB + Parquet local.
 
 ## Cache/queue
-V1: in-process bounded queues and caches + durable Postgres outbox/event records where durability matters.
+In-process bounded queues/caches + durable Postgres events where needed.
 No mandatory Redis.
-Future: Redis/Upstash only after distributed runtime requires it.
 
-## Auth
-Supabase Auth is the preferred early SaaS-compatible option.
-Local single-user development may use a dev-auth mode that cannot accidentally be enabled in production.
-
-## Reports
-PDF and CSV generated from canonical reconciled data using open-source libraries.
-Large raw research datasets are never embedded into PDF.
-
-## Observability
-V1 starts with:
-- structured JSON logs;
-- local rotating files;
-- health endpoints;
-- metrics exposed locally;
-- audit/event tables;
-- dashboard system-health page.
-
-External paid observability is deferred until needed.
+## Reports/observability
+Open-source PDF/CSV generation, structured JSON logs, health endpoints, local metrics and audit tables.
