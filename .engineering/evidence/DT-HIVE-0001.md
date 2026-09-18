@@ -5,7 +5,7 @@ Work Order: DT-HIVE-0001 (issued out-of-band as `DT-HIVE-0001-FIRST-LOCAL-SYNC-C
 Executor: local Codex-class executor pass on the user's Windows machine
 Risk class: HIGH_ASSURANCE
 Repo base SHA (before this increment): 8c428ee33d1258c718dd9e6eabc5018fe5b0f499
-Evidence commit SHA: recorded in the follow-up evidence update commit (a file cannot contain its own commit SHA); the post-evidence head is recorded in the PR body.
+Evidence commit SHA: 6245138b857f498cbe2570341ec378687cb61266
 Exact local Git SHA after evidence commit: see "Exact-head field" at the end of this file.
 
 ## 1. Environment
@@ -193,5 +193,5 @@ Per-check honesty statement: the capsule/delta-context and `checkpoint.read` sur
 ## 9. Exact-head field
 
 - Base SHA before this increment: `8c428ee33d1258c718dd9e6eabc5018fe5b0f499`
-- Exact local Git SHA after the evidence commit: recorded in the follow-up evidence update commit and in the PR body (a file cannot contain the SHA of the commit that introduces it).
+- Exact local Git SHA after the evidence commit: `6245138b857f498cbe2570341ec378687cb61266` (the evidence-commit SHA; the post-evidence head produced by this update is recorded in the PR body, because a file cannot contain the SHA of the commit that introduces it).
 - All evidence in this file was produced against `8c428ee33d1258c718dd9e6eabc5018fe5b0f499` with a clean worktree; nothing in this increment modifies strategy, trading, API or credential code.
