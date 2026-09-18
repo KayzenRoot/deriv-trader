@@ -125,3 +125,30 @@ export const CONFIG_SCHEMA_VERSION = "1.0.0" as SchemaVersion;
 export function schemaVersion(value: string): SchemaVersion {
   return value as SchemaVersion;
 }
+
+export type {
+  BrokerErrorCategory,
+  RetryClass,
+} from "./errors.js";
+export { retryClassFor, safeMessageFor } from "./errors.js";
+
+export type {
+  ActiveInstrument,
+  ContractCapability,
+  MarketTick,
+  ContractDirection,
+  ProposalAssumptions,
+  ProposalState,
+  ProposalQuote,
+  ConnectionState,
+  ConnectionHealth,
+  MarketDataSource,
+  Clock,
+} from "./market.js";
+export {
+  EFFECTIVE_PAYOUT_THRESHOLD,
+  effectivePayout,
+  breakEven,
+  proposalKey,
+  systemClock,
+} from "./market.js";

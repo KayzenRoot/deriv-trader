@@ -6,6 +6,14 @@
 import Fastify, { type FastifyInstance } from "fastify";
 import { loadConfig, isLoopbackHost, type AppConfig } from "@deriv-trader/config";
 import type { HealthReport, ServiceState } from "@deriv-trader/domain";
+import {
+  createMarketModule,
+  dataStatus,
+  marketStatus,
+  opportunities,
+  scannerStatus,
+  type MarketModule,
+} from "./market.js";
 
 export interface TraderServiceOptions {
   readonly config?: AppConfig;
@@ -16,6 +24,7 @@ export interface TraderService {
   readonly app: FastifyInstance;
   readonly config: AppConfig;
   readonly startedAt: Date;
+  readonly market: MarketModule;
   getState(): ServiceState;
   markReady(): void;
   close(): Promise<void>;
@@ -72,16 +81,28 @@ export function createTraderService(options: TraderServiceOptions = {}): TraderS
     uptimeSeconds: Math.max(0, Math.floor((Date.now() - startedAt.getTime()) / 1000)),
   }));
 
+  // DT-WP-02: read-only market/data/scanner observability. The module boots
+  // offline (no auto-connect); endpoints report current state honestly.
+  const market: MarketModule = createMarketModule(config);
+
+  void app.get("/v1/market/status", () => marketStatus(market));
+  void app.get("/v1/scanner/status", () => scannerStatus(market, config));
+  void app.get("/v1/scanner/opportunities", () => opportunities(market, config));
+  void app.get("/v1/data/status", () => dataStatus(market, config));
+
   return {
     app,
     config,
     startedAt,
+    market,
     getState: () => mutable.state,
     markReady: () => {
       mutable.state = "READY";
     },
     close: async () => {
       mutable.state = "STOPPING";
+      await market.supervisor.stop().catch(() => undefined);
+      await market.client.close().catch(() => undefined);
       await app.close();
       mutable.state = "STOPPED";
     },

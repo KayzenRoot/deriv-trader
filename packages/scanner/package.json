@@ -1,7 +1,7 @@
 {
   "name": "@deriv-trader/scanner",
   "version": "0.1.0",
-  "description": "Scanner types/interfaces for later DT-WP-02 implementation.",
+  "description": "Scanner runtime: eligibility engine, opportunity lattice, payout pulse.",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -16,6 +16,8 @@
     "@deriv-trader/market-data": "0.1.0"
   },
   "devDependencies": {
+    "@deriv-trader/testing": "0.1.0",
+    "@types/node": "24.13.5",
     "typescript": "6.0.3",
     "vitest": "5.0.1"
   }

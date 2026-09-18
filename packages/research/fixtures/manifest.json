@@ -1,0 +1,17 @@
+{
+  "datasetId": "dt-wp02-fixture-v1",
+  "parserVersion": "deriv-options-2026-09-18",
+  "buildSha": "local-dev",
+  "files": [
+    {
+      "path": "packages/research/fixtures/ticks-part-0001.parquet",
+      "sha256": "af76ebbadac1c740aacb1419a4fd75f9b52426c76f4a0a55d875483d3d09a3a3",
+      "rows": 20
+    },
+    {
+      "path": "packages/research/fixtures/proposals-part-0001.parquet",
+      "sha256": "293abdfc528232e18b6c42ecc0885fcecc5d8dc996d042dd9853dff8880f864f",
+      "rows": 6
+    }
+  ]
+}

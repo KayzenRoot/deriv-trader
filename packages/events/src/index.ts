@@ -13,6 +13,18 @@ export type FoundationEventType =
   | "CONFIG_LOADED"
   | "HEALTH_CHECKED";
 
+/** Market/data/scanner lifecycle events (DT-WP-02). Read-only channel. */
+export type MarketDataEventType =
+  | "SYMBOLS_REFRESHED"
+  | "CAPABILITY_REFRESHED"
+  | "TICK_GAP_DETECTED"
+  | "SCHEMA_MISMATCH_OBSERVED"
+  | "PROPOSAL_STALE_OBSERVED"
+  | "CONNECTION_STATE_CHANGED"
+  | "BUDGET_THROTTLED"
+  | "DATASET_FINALIZED"
+  | "DATASET_QUARANTINED";
+
 export interface FoundationEventPayload {
   readonly message: string;
   readonly buildSha?: string;

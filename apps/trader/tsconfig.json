@@ -10,6 +10,10 @@
   "references": [
     { "path": "../../packages/domain" },
     { "path": "../../packages/config" },
-    { "path": "../../packages/events" }
+    { "path": "../../packages/events" },
+    { "path": "../../packages/db" },
+    { "path": "../../packages/deriv-adapter" },
+    { "path": "../../packages/market-data" },
+    { "path": "../../packages/scanner" }
   ]
 }

@@ -1,27 +1,15 @@
 /**
- * Market-data boundary (DT-WP-01 Phase F).
- * Types/interfaces that DT-WP-02 can implement. No capture yet.
+ * Market-data package entry (DT-WP-02).
+ * Registry, shared ticks and freshness. No broker socket imports here —
+ * the Deriv adapter is injected through the domain MarketDataSource port.
  */
-export interface Tick {
-  readonly symbol: string;
-  readonly epoch: number;
-  readonly quote: number;
-  readonly receivedAt: string;
-}
-
-export interface Candle {
-  readonly symbol: string;
-  readonly epoch: number;
-  readonly open: number;
-  readonly high: number;
-  readonly low: number;
-  readonly close: number;
-}
-
-export type MarketFreshness = "FRESH" | "STALE" | "UNKNOWN";
-
-export interface MarketSnapshot {
-  readonly symbol: string;
-  readonly tick: Tick | null;
-  readonly freshness: MarketFreshness;
-}
+export { SymbolRegistry } from "./registry.js";
+export type {
+  InstrumentState,
+  RegistryFilter,
+  RegistryOptions,
+  RegistryRecord,
+} from "./registry.js";
+export { SharedTickHub, classifyFreshness, DEFAULT_THRESHOLDS } from "./ticks.js";
+export type { FreshnessState, FreshnessInput, FreshnessThresholds } from "./ticks.js";
+export type { Tick, Candle, MarketFreshness, MarketSnapshot } from "./legacy.js";
