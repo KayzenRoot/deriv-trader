@@ -6,41 +6,37 @@ Status: V1 PLANNING BASELINE; final versions pinned in DT-ARCH-0001.
 LOCAL-FIRST, FREE-FIRST, HIGH_ASSURANCE, USER-ISOLATED, MODULAR-MONOLITH-FIRST.
 
 ## Runtime
-One local Node.js/TypeScript Trader Worker process hosts the trading-critical modules and exposes a versioned local HTTP + WebSocket/SSE API to the Next.js UI.
+One local Node.js/TypeScript Trader Worker exposes a versioned local HTTP + WebSocket/SSE API to the Next.js UI.
 
 ## Core modules
 1. Next.js/React Operator + Admin UI
-2. Supabase Auth identity/session
-3. RLS-protected operational Postgres
-4. Per-user Deriv Connection Manager
-5. SecretStore
-6. Local Worker Binding
-7. Deriv Adapter
-8. Market Data / Eligibility / Proposal Cache
+2. Supabase Auth + RLS operational Postgres
+3. Per-user Deriv Connection Manager + SecretStore
+4. Local Worker Binding
+5. Deriv Connection Supervisor
+6. Symbol & Contract Registry
+7. Shared Market Data Pipeline
+8. Market Freshness Matrix
 9. Payout Pulse Scheduler
-10. Multi-Runner Strategy Runtime
-11. Global Risk Engine + Slot Arbiter + Loss Cascade Brake
-12. Demo Execution + Reconciliation
-13. Event/Audit model + Order Flight Recorder
-14. Reporting/Analytics
-15. DuckDB + Parquet Quant Lab/Replay
+10. Market Eligibility Engine / Opportunity Lattice
+11. Multi-Runner Strategy Runtime
+12. Global Risk Engine + Slot Arbiter + Loss Cascade Brake
+13. Demo Execution + Reconciliation
+14. Event/Audit + Order Flight Recorder
+15. Reporting/Analytics
+16. DuckDB + Parquet Quant Lab/Replay
 
-## Authority
-Browser/UI expresses intent only.
-Trading authority stays inside the worker.
-Strategies cannot submit broker orders.
-Risk admission is centralized.
-Execution cannot bypass risk.
-Admin cannot bypass user ownership or live gates.
+## Market-data rule
+External subscriptions and proposal traffic are shared wherever safe. Runner count must not linearly multiply Deriv API calls.
+
+## Execution path
+authenticated user -> bound worker -> Deriv connection -> active symbols/contracts -> shared ticks -> payout/freshness eligibility -> active Runner -> Edge Gate -> Risk/Slot Gate -> final proposal refresh -> demo execution/skip -> reconciliation -> audit/reporting.
 
 ## Data
 Operational: Supabase/Postgres.
-Research/time-series: local Parquet + DuckDB.
-Hot state: bounded in-memory structures.
+High-frequency/research: local Parquet + DuckDB.
+Hot state: bounded memory.
 Redis not mandatory.
-
-## Scale strategy
-V1 is a modular monolith locally. Split services only after measured scale/reliability requirements justify the operational cost.
 
 Governance: GEF.
 Context: Hive when healthy.

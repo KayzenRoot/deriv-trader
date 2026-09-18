@@ -3,30 +3,29 @@
 ## NECESSARY — V1
 - DT-PLAN-0001 — freeze V1 product/system baseline.
 - DT-UX-0001 — UGAS identity/design system.
-- DT-ARCH-0001 — pin local-first/free-first runtime stack and repository architecture.
-- DT-API-0001 — Deriv adapter + capability/rate-limit contract tests.
-- DT-DATA-0001 — Parquet/DuckDB market/proposal capture + operational DB schema.
-- DT-STRAT-0001 — independently test five strategy families / expiry Runners.
-- DT-RISK-0001 — implement/test risk engine.
-- DT-SCANNER-0001 — scanner + Payout Pulse Scheduler.
+- DT-ARCH-0001 — pin runtime stack/repository architecture.
+- DT-API-0001 — Deriv adapter, connection supervisor and current-schema contract tests.
+- DT-DATA-0001 — Parquet/DuckDB market/proposal capture + operational schema.
+- DT-SCANNER-0001 — Symbol/Contract Registry + shared Market Data Pipeline + Market Freshness Matrix + Payout Pulse Scheduler + Eligibility Engine.
+- DT-STRAT-0001 — validate five strategy families / expiry Runners.
+- DT-RISK-0001 — risk engine.
 - DT-EXEC-DEMO-0001 — demo execution/reconciliation.
 - DT-DASH-0001 — dashboard/reporting.
 - DT-ADMIN-0001 — admin/SaaS-ready foundation.
 - DT-HIVE-COMPAT-0001 — Hive compatibility debt.
 
 ## IMPORTANT
-- Supabase free-quota telemetry;
-- optional cloud preview pipeline;
-- richer analytics/presets/notifications;
-- tenant-compatible domain boundaries.
+- API-budget telemetry and tuning;
+- proposal-subscription cardinality experiments;
+- cloud/free-quota telemetry;
+- notifications and richer analytics.
 
 ## FUTURE
-- commercial hosting migration/upgrade;
-- remote always-on trading workers;
-- distributed Redis/cache if required;
+- commercial hosting;
+- hosted worker fleet;
+- distributed cache if required;
 - live-money gate/execution;
-- full multi-tenancy/billing;
-- additional brokers/markets.
+- billing/full SaaS.
 
 ## ACCEPTED
 - DT-DISCOVERY-0001
