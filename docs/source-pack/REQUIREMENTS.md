@@ -5,24 +5,16 @@ Status: PLANNING / DT-PLAN-0001.
 - Reproducible data/backtests with provenance.
 - Walk-forward and strict out-of-sample evaluation.
 - Payout-aware expected value.
-- Risk limits, kill switch, idempotent order handling and reconciliation.
-- Complete decision/execution audit trail.
+- Multiple concurrent Strategy Runners are supported; each Runner is one strategy + one expiry.
+- No mandatory cross-strategy confluence.
+- Global Risk Engine arbitrates all Runner signals.
+- User configures fixed stake, max stake, max simultaneous orders, max open exposure, max orders per instrument, daily max loss, optional daily target, max consecutive losses, cooldowns and operating windows.
+- Risk state and hard-stop transitions must be atomic relative to order admission.
+- Loss Cascade Brake may throttle/pause clustered-loss conditions without altering strategy direction.
+- No stale blocked signal may be blindly queued and executed later.
+- Complete decision/execution/risk audit trail is mandatory.
 - No committed secrets.
-- Exact-head test/evidence binding.
-- Hive V1 is optional, health-checked and subordinate to Git.
-- V1 exposes five strategy families, each with independently validated 1m/3m/5m expiry profiles where accepted.
-- Users may start multiple Strategy Runners concurrently.
-- Each Runner is one strategy + one expiry profile.
-- Multiple Runners operate independently. There is no mandatory confluence, voting or consensus among strategies.
-- The user can start/stop each Runner individually and can start/stop all selected Runners as a group.
-- The user configures a global maximum number of simultaneous open orders.
-- The global Risk Engine must enforce that cap across all active Runners.
-- When no global order slot is available, a signal must be skipped or freshly re-evaluated later; stale signals must never be queued and blindly executed.
-- The user configures fixed stake per order in V1, maximum stake, daily stop, optional daily target, max consecutive losses, per-instrument order cap and cooldown.
-- Each strategy must show canonical name, plain-language summary, market behavior followed, entry family, supported expiries and limitations.
-- Risk and broker eligibility gates remain global and may block any Runner signal.
-- The user dashboard must be a complete performance center with charts, motion, KPI summaries, operational state and drill-down.
-- Reporting must support today, 2d, 7d, 15d, 30d and custom date ranges.
-- Reporting must attribute every order to strategy + expiry Runner.
-- V1 reporting must support PDF summary and CSV detail export.
-- Analytics must use reconciled canonical records and expose stale/unreconciled state instead of silently presenting uncertain numbers.
+- Exact-head evidence binding.
+- Dashboard must expose risk state, slot usage, open exposure, drawdown and risk-block reasons.
+- Reporting must attribute results to exact Runner and support today, 2d, 7d, 15d, 30d and custom periods.
+- Live-money remains outside V1 acceptance.

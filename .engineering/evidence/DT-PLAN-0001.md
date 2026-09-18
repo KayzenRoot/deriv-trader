@@ -3,15 +3,18 @@ Status: COLLECTING
 Planning base: DT-CP-0003
 Scope class: product/system planning only.
 
-Latest clarifications incorporated:
-- multiple concurrent Strategy Runners, each strategy + expiry;
-- global Risk Engine / Order Slot Arbiter with hard simultaneous-order cap;
-- Strategy Control Center and concurrency safety model;
-- Quant Lab and deterministic backtester/replay plan;
-- Runner-level acceptance for up to 15 strategy-expiry profiles;
-- portfolio simulation of shared slot/risk effects without cross-strategy confluence.
+Latest planning additions:
+- complete Global Risk Engine;
+- hard simultaneous-order and open-exposure caps;
+- daily loss/optional target controls;
+- consecutive-loss and cooldown controls;
+- explicit risk state machine;
+- machine-readable risk reason codes;
+- Risk Center UX;
+- Loss Cascade Brake for clustered-loss protection;
+- dedicated risk/concurrency test matrix.
 
-Current Deriv documentation confirms public tick streaming/historical tick access and current proposal fields/compatibility considerations. Historical tick availability is treated as market-data evidence only; exact payout-aware expectancy requires captured proposal economics unless separately reconstructed and proven.
+Loss Cascade Brake is strictly an admission/risk regulator and does not combine strategy signals or choose direction.
 
 No implementation, credentials, trading or profitability claim.
 Pending: further planning iterations, final consistency audit, governance CI, exact-head review and checkpoint delta.
