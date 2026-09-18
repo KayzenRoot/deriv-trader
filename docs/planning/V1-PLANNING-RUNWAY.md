@@ -4,10 +4,10 @@ User instruction: explicitly warn on the final planning response immediately bef
 
 ## Completed
 1. Final UX/navigation + UGAS asset production contract. ✅
+2. Admin/security/permissions final pass. ✅
+3. Notifications/alerts and operator ergonomics. ✅
 
 ## Remaining planning blocks
-2. Admin/security/permissions final pass.
-3. Notifications/alerts and operator ergonomics.
 4. DT-ARCH-0001 stack/version freeze and module dependency audit.
 5. V1 end-to-end acceptance map / Definition of Done consistency pass.
 6. DT-HIVE-COMPAT sequencing decision.

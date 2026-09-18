@@ -3,19 +3,15 @@ Status: COLLECTING
 Planning base: DT-CP-0003
 Scope class: product/system planning only.
 
-Latest planning block completes the V1 UX/navigation and UGAS production contract:
-- primary sitemap;
-- desktop application shell;
-- universal/trading UX state model;
-- responsive/mobile/accessibility contract;
-- UGAS asset production contract;
-- critical operator journeys;
-- global Stop All/Kill accessibility;
-- authoritative worker-state UX semantics.
+Latest planning block completes:
+- UX/navigation + UGAS production contract;
+- USER/ADMIN permission model;
+- security trust boundaries;
+- localhost-first worker authority;
+- notification/alert system;
+- operator ergonomics and fast emergency controls.
 
-The product remains desktop-first but monitorable/controllable from mobile for critical actions.
-
-No asset is claimed as UGAS-produced until the actual UGAS workflow generates/approves it.
+High-risk admin actions are explicit/audited; browser/admin cannot bypass broker-secret, risk or live-execution boundaries.
 
 No infrastructure provisioned, credentials handled or trading performed.
-Pending: admin/security/permissions, notifications/alerts/operator ergonomics, architecture freeze, acceptance consistency, Hive sequencing and final planning audit/PR/checkpoint.
+Pending: architecture/version freeze, end-to-end acceptance consistency, Hive compatibility sequencing and final planning audit/PR/checkpoint.
