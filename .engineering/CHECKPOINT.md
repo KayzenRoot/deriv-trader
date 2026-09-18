@@ -1,61 +1,66 @@
 # DT Checkpoint
-Checkpoint: DT-CP-0004
+Checkpoint: DT-CP-0005
 Date: 2026-09-18
 Mode: GREENFIELD
 Risk: HIGH_ASSURANCE
 GEF baseline: V1.0.0 governance model
-State: PLANNING_BASELINE_ACCEPTED_READY_FOR_DEV_BOOTSTRAP
+State: FOUNDATION_ACCEPTED_READY_FOR_DERIV_DATA_SCANNER
 
 ## Accepted evidence
 - DT-CP-0001 bootstrap accepted.
 - DT-CP-0002 discovery accepted.
 - DT-CP-0003 local preflight/planning-ready accepted.
-- DT-PLAN-0001 PR #4 exact audited head: 1c056801f3056fa50ca3d28261d180b012bab756.
-- Governance workflow run #11: SUCCESS on exact audited head.
-- Exact-head COMMENT review id: 5251462702.
-- Squash merge SHA: 896e802bd452f963a162cbb9965ed298c056f192.
-- Final compare before merge: 38 commits ahead, 0 behind; no file deletions.
-- Final semantic consistency findings F-01..F-04: corrected.
-- CRITICAL/HIGH unresolved planning findings: 0.
+- DT-CP-0004 planning baseline accepted.
+- DT-WP-01 / DT-DEV-BOOTSTRAP-0001 PR #5 exact audited head: d154126277ea4b58e750eb67d088a7a97d352559.
+- Product workflow PR run #8: SUCCESS.
+- Governance workflow PR run #18: SUCCESS.
+- Exact-head COMMENT review id: 5252676948.
+- Squash merge SHA: 9003ed5b9b70b234b5c1a2372679a6fb17ce81a7.
+- Final compare before merge: 5 commits ahead, 0 behind; 98 changed files; 0 deletions.
+- CRITICAL/HIGH unresolved Foundation findings: 0.
 
-## Accepted V1 baseline
+## Foundation accepted
+- npm-workspaces TypeScript monorepo.
+- Node 24 LTS / npm 11.x engine policy.
+- Next.js 16.3.x Active LTS/security line reconciled.
+- React 19.2.x, Tailwind 4.3.x, Motion 13.x, ECharts 6.1.x.
+- Fastify trader worker, loopback-only by default.
+- Supabase/Auth/DB/SecretStore skeleton boundaries.
+- Domain/events/config/testing foundations.
+- All planned package boundaries scaffolded.
+- Explicit package dependency allowlist + negative self-tests.
+- Cycle check.
+- Cross-platform .gitattributes/.editorconfig EOL policy.
+- Clean typed lint on Ubuntu without prebuilt dist artifacts.
+- Unit tests/builds/web production build/trader health smoke.
+- npm audit high-severity gate green.
+- Product + governance CI green.
+- Current Deriv Options API REST/public-WS endpoints represented in config only, with no live network/trading implementation.
+- No broker economic path.
+- No real credentials.
+- No live-money execution.
+
+## Architecture invariants retained
 - LOCAL-FIRST / FREE-FIRST / modular-monolith-first.
-- Supabase Auth + RLS for product identity/ownership.
-- Per-user Deriv connection with SecretStore abstraction.
-- Local PAT + App ID for initial local flow; hosted OAuth 2.0 + PKCE path reserved for future SaaS implementation after current-doc verification.
-- Multiple concurrent Strategy Runners; one Runner = one strategy family + one expiry profile.
-- Five strategy families; 1m/3m/5m profiles validated independently.
-- No mandatory cross-strategy confluence.
-- Global Risk Engine + Order Slot Arbiter + Loss Cascade Brake.
-- Shared market data, Market Freshness Matrix, Payout Pulse Scheduler and API Budget Manager.
-- Proposal-aware Edge Gate using actual ask_price/payout economics.
-- Demo/paper-first execution, reconciliation and Order Flight Recorder.
-- Complete dashboard, scanner, strategy control, orders, analytics, risk, reports, settings, admin and system health UX.
-- Supabase/Postgres operational plane; local Parquet + DuckDB research plane.
-- Dataset Passport + Data Quality Gate.
-- Frozen bootstrap technology lines documented in V1-STACK-FREEZE.md.
-- A0-A11 end-to-end acceptance gates and V1 DoD accepted.
-- UGAS is the required visual-asset production pipeline.
-
-## Hive compatibility
-- Git remains canonical.
-- Hive lexical retrieval/memory remain usable as optional accelerators.
-- DT-HIVE-COMPAT-0001 remains IMPORTANT/PARALLEL, not a blocker to first coding increment.
-- First Deriv Trader bootstrap must add/validate explicit .gitattributes EOL policy.
+- Web remains presentation/client boundary and cannot import worker economic/service modules directly.
+- Trader Worker remains trading authority boundary.
+- Strategies cannot execute broker orders.
+- Risk remains mandatory and centralized.
+- Research has no economic authority.
+- Git remains canonical over Hive.
 
 ## Still unproven
-- Actual V1 implementation.
-- Exact final compatible dependency patch set/lockfile.
-- Runtime Deriv contract behavior under our adapter.
-- Prospective proposal/payout distribution.
+- Real Deriv runtime adapter behavior.
+- Active-symbol/contracts/tick/proposal normalization against current API.
+- API budget behavior under load.
+- Prospective tick/proposal capture.
+- Parquet/DuckDB runtime pipeline.
+- Scanner/Payout Pulse/Market Freshness operation.
 - Any strategy edge/profitability.
-- Demo end-to-end execution/reconciliation.
-- Commercial/live regulatory suitability.
+- Demo execution/reconciliation.
 - Live-money execution.
 
 ## Next legal increment
-1. DT-DEV-BOOTSTRAP-0001 — first development Work Order.
-2. DT-UX-0001 and other non-conflicting groundwork may follow/parallelize only after governed Work Orders.
-3. DT-HIVE-COMPAT-0001 may proceed in parallel as an IMPORTANT compatibility improvement.
+DT-WP-02 — DERIV DATA & SCANNER MODULE.
 
-No live-money implementation is admitted.
+Live-money remains blocked.
