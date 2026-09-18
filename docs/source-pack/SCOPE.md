@@ -1,5 +1,5 @@
 # Scope
-NECESSARY now: GEF V1 adoption; Hive V1 integration contract; discovery; Deriv API feasibility; data/research architecture; test/benchmark plan; security/risk baseline.
-IMPORTANT later: demo engine, backtester, strategy laboratory, regime detection, monitoring/dashboard.
-FUTURE: live execution, portfolio scaling, additional brokers/markets, ML ensembles.
-OUT OF SCOPE now: trading strategy implementation, live credentials, deposits/withdrawals, real-money orders, profitability claims, martingale, bypassing platform controls.
+NECESSARY now: GEF/Hive governed planning; Deriv API feasibility; visual identity via UGAS; V1 dashboard/admin/configuration; five strategy families with independently selectable 1m/3m/5m Runners; multiple concurrent Runners; payout eligibility >=80% subject to measured broker offering; global risk/order-slot engine; data/research architecture; test/benchmark plan; security/risk baseline.
+IMPORTANT later: per-Runner advanced overrides, richer presets, adaptive tuning, SaaS/multi-tenant foundations, monitoring/observability expansion.
+FUTURE: live execution after explicit gate, portfolio scaling, additional brokers/markets, ML ensembles, billing and full micro-SaaS commercialization.
+OUT OF SCOPE now: mandatory confluence among strategies, unlimited duplicate runners, delayed execution of stale queued signals, martingale as a product default, bypassing broker controls, unvalidated live-money execution, profitability claims.
