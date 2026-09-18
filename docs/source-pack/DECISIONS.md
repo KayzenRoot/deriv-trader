@@ -6,3 +6,6 @@ ADR-0004 ACCEPTED: research/demo validation precede any live-money implementatio
 ADR-0005 ACCEPTED: GEF V1 remains a separate source workspace; this repo adopts governance artifacts/contracts rather than vendoring the complete GEF implementation.
 ADR-0006 ACCEPTED: V1 strategy execution is mutually exclusive per user/profile. The user chooses one active strategy at a time. No mandatory confluence/consensus across the five V1 strategies is required to open an order.
 ADR-0007 ACCEPTED: V1 uses Deriv Trader's own strategy runtime. Deriv-hosted predefined automation endpoints are not the strategy brain of V1; they may be evaluated later as an optional execution/integration surface.
+ADR-0008 ACCEPTED: internal filters/factors inside one selected strategy are allowed and required for quality. They are not cross-strategy confluence. Other V1 strategies never confirm, veto, average or blend the selected strategy's signal.
+ADR-0009 ACCEPTED: strategy internals are versioned validated presets in V1. Users control strategy choice, expiry/risk/execution settings; raw research parameters are not broadly exposed until a future expert-mode decision.
+ADR-0010 ACCEPTED: effective payout and break-even probability are computed from actual proposal economics (ask price and payout), never from a marketing label alone.
