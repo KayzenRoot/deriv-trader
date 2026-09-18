@@ -253,3 +253,11 @@ or live-broker functionality, evidence complete, PR #5 open and NOT merged.
   SHA is recorded in the final executor report after commit. This file records
   the code-change basis (implementation head) truthfully; run IDs for the final
   tip are confirmed via the GitHub UI before the executor stops.
+- Disposable clean-worktree proof (head `2187208`, detached worktree, no
+  `node_modules`, no `dist`, no `*.tsbuildinfo`): `npm ci` (257 packages) →
+  `npm run lint` GREEN immediately with 0 `dist` dirs present (F1 proven, no
+  build first); `check:eol` GREEN; `check:deps` GREEN (40/40 self-tests);
+  `check:cycles` GREEN; `typecheck` GREEN; `test` GREEN (11 files, 23 tests);
+  `build` GREEN; web production build GREEN; trader build + loopback
+  `/v1/health` smoke GREEN (`HEALTHY`/`READY`/`DEMO`); `audit:high` GREEN (0
+  vulnerabilities); `git diff --check` clean. Worktree removed after proof.
