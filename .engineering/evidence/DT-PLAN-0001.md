@@ -3,16 +3,16 @@ Status: COLLECTING
 Planning base: DT-CP-0003
 Scope class: product/system planning only.
 
-Latest planning block adds the operational data model and future micro-SaaS ownership boundary:
-- user_id is the V1 tenant/ownership key;
-- Supabase Auth identity is separated from Deriv credentials;
-- RLS/server authorization protects user-owned records;
-- local worker installations are explicitly bound to a user;
-- every order is attributable to user_id + deriv_connection_id + runner_id;
-- admin APIs never expose plaintext broker secrets;
-- raw high-frequency research data stays outside the small operational DB.
+Architecture planning now includes:
+- user-owned operational data model and RLS boundaries;
+- Local Worker Binding;
+- modular-monolith local Trader Worker;
+- versioned local HTTP + WebSocket/SSE contract;
+- append-only domain event vocabulary;
+- strict dependency direction between strategies, risk, execution, UI and broker adapter;
+- startup/shutdown/crash-recovery fail-closed contract.
 
-The V1 remains intentionally simple: no organizations/teams/billing machinery yet.
+This keeps V1 fast to build while preserving future SaaS/hosted-worker migration paths.
 
 No infrastructure provisioned, credentials handled or trading performed.
 Pending: further planning iterations, final consistency audit, governance CI and exact-head review.
