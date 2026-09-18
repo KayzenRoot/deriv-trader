@@ -1,15 +1,40 @@
 # Work Order DT-PLAN-0001
 
-OBJECTIVE: Freeze a deliberately short Deriv Trader V1 product baseline before implementation.
-CONTEXT: DT-CP-0003 planning-ready. User has defined visual direction, payout threshold, expiry targets, five individual strategy profiles, strong configurable risk, dashboard/admin and future micro-SaaS intent.
-SCOPE: V1 product/modules/UX/risk/admin/scanner/strategy-selection baseline and build roadmap.
-OUT OF SCOPE: coding, credentials, live money, strategy profitability claims, full SaaS billing/multi-tenancy.
-FILES/SOURCES TO READ: canonical Source Pack; discovery docs; DT-HIVE evidence; current official Deriv API docs.
-REQUIREMENTS: short V1; UGAS visual pipeline; all eligible instruments; payout >=80% default; 1m/3m/5m; exactly one active strategy; configurable risk; broker-limit compliance.
-ARCHITECTURE RULES: deterministic gates; subscription/cache/backoff; Git canonical; HIGH_ASSURANCE.
-CONSTRAINTS: API limits and contract availability are runtime/external facts; no assumptions promoted as evidence.
-ACCEPTANCE CRITERIA: V1 master plan, modules, strategy selection/catalog, risk configuration, UI/UGAS brief, admin foundation, scanner budget model, roadmap and V1 DoD exist and are mutually consistent.
-TESTS: governance/source consistency and exact-head review.
-DELIVERABLES: planning pack only.
+OBJECTIVE: Freeze a deliberately short, production-oriented Deriv Trader V1 product/system baseline before implementation.
+
+CONTEXT: DT-CP-0003 planning-ready. Product direction evolved during governed planning to include multi-Runner execution, complete dashboard/reporting, per-user Deriv connections, local-first/free-first architecture, quantitative validation, operational data/research separation and future micro-SaaS ownership boundaries.
+
+SCOPE: V1 product/modules/UX, multi-Runner strategy model, risk, scanner/market-data, Deriv adapter, auth/connections, data/research, demo execution, dashboard/reporting, admin/security, notifications, runtime/repository architecture, stack freeze, acceptance map and build roadmap.
+
+OUT OF SCOPE: product coding, credentials, live money, unproven profitability claims, full billing, organizations/teams, hosted worker fleet and production commercial deployment.
+
+FILES/SOURCES TO READ: canonical Source Pack; discovery docs; DT-HIVE evidence; current official Deriv API docs; current planning artifacts under docs/planning.
+
+REQUIREMENTS:
+- short LOCAL-FIRST / FREE-FIRST V1;
+- UGAS visual pipeline;
+- full currently eligible instrument universe;
+- default effective payout >=80%;
+- independently validated 1m/3m/5m Runner profiles;
+- multiple concurrent Strategy Runners;
+- configurable global simultaneous-order/risk controls;
+- per-user Deriv connection;
+- Supabase Auth identity;
+- broker-limit compliance;
+- deterministic/auditable demo execution;
+- proposal-aware quantitative evidence;
+- complete dashboard/reporting/admin/system-health UX.
+
+ARCHITECTURE RULES: deterministic gates; shared subscriptions/caching/backoff; typed Deriv adapter; Git canonical; GEF governs; HIGH_ASSURANCE; no strategy/UI/research bypass of Risk/Execution authority.
+
+CONSTRAINTS: API limits, contract availability, payout, schemas and free-tier quotas are runtime/external facts and must be re-verified rather than permanently assumed.
+
+ACCEPTANCE CRITERIA: planning pack, Source Pack, decisions, DoD, architecture, build roadmap and end-to-end acceptance map are mutually consistent; stale single-strategy assumptions removed; exact-head planning audit passes; no product implementation occurs.
+
+TESTS: source consistency audit; compare-to-main safety audit; governance checks; exact-head PR review.
+
+DELIVERABLES: planning/governance pack only.
+
 REVIEW FORMAT: APPROVED / CORRECTION REQUIRED / BLOCKED.
-STOP CONDITION: no product implementation in DT-PLAN-0001.
+
+STOP CONDITION: DT-PLAN-0001 may close only after final consistency audit, PR exact-head review, successful merge and checkpoint promotion. No product implementation in this Work Order.

@@ -1,24 +1,43 @@
 # Evidence Bundle · DT-PLAN-0001
-Status: READY_FOR_FINAL_AUDIT
+
+Status: FINAL_AUDIT_IN_PROGRESS
 Planning base: DT-CP-0003
-Scope class: product/system planning only.
+Risk class: HIGH_ASSURANCE
+Scope: planning/governance only.
 
-Penultimate planning pass completed:
-- end-to-end acceptance gates A0-A11;
-- V1 acceptance matrix;
-- Definition of Done reconciled to the current multi-Runner model;
-- stale one-active-strategy language removed from canonical DoD;
-- DT-HIVE-COMPAT sequencing decided.
+## Planning scope completed
+The branch defines and reconciles:
+- multi-Runner product model;
+- five independent strategy families and independent 1m/3m/5m Runner validation;
+- Quant Lab, deterministic replay and proposal-aware Edge Gate;
+- Global Risk Engine, Loss Cascade Brake and concurrency controls;
+- demo execution/reconciliation and Order Flight Recorder;
+- complete dashboard/reporting/admin UX;
+- per-user Supabase Auth + Deriv connection + SecretStore model;
+- LOCAL-FIRST / FREE-FIRST architecture;
+- Supabase operational / Parquet+DuckDB research data split;
+- Deriv adapter, API Budget Manager, Schema Drift Guard and market scanner;
+- notifications/security/permissions;
+- frozen V1 stack;
+- A0-A11 end-to-end acceptance gates;
+- Hive compatibility sequencing.
 
-Hive compatibility decision:
-- not a blocker to begin Deriv Trader coding;
-- Git/GEF remain canonical/fallback;
-- first Deriv Trader bootstrap includes explicit .gitattributes/EOL policy;
-- Hive-side EOL-tolerant cleanliness + configurable checkpoint paths remain separate parallel IMPORTANT work;
-- advanced Hive capsule/delta/checkpoint surfaces must not become mandatory gates until compatibility is fixed/evidenced.
+## Final pre-PR audit
+Compare against main found branch ahead and not behind, with no deleted files.
 
-No infrastructure provisioned, credentials handled or trading performed.
+Consistency findings corrected before PR:
+- stale one-active-strategy text in PROJECT-OVERVIEW;
+- stale one-active-strategy requirement in DT-PLAN Work Order;
+- build roadmap now begins with DT-DEV-BOOTSTRAP-0001;
+- explicit DT-PLAN final Context Lock added.
 
-ONLY REMAINING PLANNING BLOCK:
-Final consistency audit -> PR -> governance/exact-head review -> checkpoint.
-The response completing that block must be explicitly identified to the user as the last planning response before the first development prompt.
+## Safety
+No application/trading implementation, credential handling or trading occurred in DT-PLAN-0001.
+Live money remains excluded.
+
+## Remaining closure evidence
+- PR number/head;
+- governance/CI result;
+- exact-head review;
+- merge SHA;
+- checkpoint promotion on main.

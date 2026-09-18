@@ -10,11 +10,10 @@ User instruction: explicitly warn on the final planning response immediately bef
 5. V1 end-to-end acceptance map / Definition of Done consistency pass. ✅
 6. DT-HIVE-COMPAT sequencing decision. ✅
 
-## Remaining planning block
-7. Final DT-PLAN-0001 consistency audit, PR, exact-head review and checkpoint.
+## Final block in progress
+7. Final DT-PLAN-0001 consistency audit, PR, exact-head review and checkpoint. 🔄
 
 ## Transition rule
-The response that completes item 7 MUST explicitly tell the user:
-"Esta é a última resposta de planejamento antes do primeiro prompt de desenvolvimento."
+The response completing item 7 is explicitly the last planning response before the first development prompt.
 
-Only after that response may the first implementation prompt/PDF be generated.
+Only after item 7 closes may the first implementation prompt/PDF be generated.
