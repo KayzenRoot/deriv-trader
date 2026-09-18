@@ -9,11 +9,11 @@ User instruction: explicitly warn on the final planning response immediately bef
 4. DT-ARCH-0001 stack/version freeze and module dependency audit. ✅
 5. V1 end-to-end acceptance map / Definition of Done consistency pass. ✅
 6. DT-HIVE-COMPAT sequencing decision. ✅
+7. Final DT-PLAN-0001 consistency audit, PR, exact-head review and checkpoint. ✅
 
-## Final block in progress
-7. Final DT-PLAN-0001 consistency audit, PR, exact-head review and checkpoint. 🔄
+## Planning result
+DT-PLAN-0001 is CLOSED / APPROVED.
+DT-CP-0004 is the promoted planning checkpoint.
 
-## Transition rule
-The response completing item 7 is explicitly the last planning response before the first development prompt.
-
-Only after item 7 closes may the first implementation prompt/PDF be generated.
+## Next action
+The next response may generate the first implementation prompt/PDF for DT-DEV-BOOTSTRAP-0001.

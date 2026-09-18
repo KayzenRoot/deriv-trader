@@ -1,43 +1,38 @@
 # Evidence Bundle · DT-PLAN-0001
 
-Status: FINAL_AUDIT_IN_PROGRESS
+Status: APPROVED / CLOSED
 Planning base: DT-CP-0003
+Promoted checkpoint: DT-CP-0004
 Risk class: HIGH_ASSURANCE
 Scope: planning/governance only.
 
-## Planning scope completed
-The branch defines and reconciles:
-- multi-Runner product model;
-- five independent strategy families and independent 1m/3m/5m Runner validation;
-- Quant Lab, deterministic replay and proposal-aware Edge Gate;
-- Global Risk Engine, Loss Cascade Brake and concurrency controls;
-- demo execution/reconciliation and Order Flight Recorder;
-- complete dashboard/reporting/admin UX;
-- per-user Supabase Auth + Deriv connection + SecretStore model;
-- LOCAL-FIRST / FREE-FIRST architecture;
-- Supabase operational / Parquet+DuckDB research data split;
-- Deriv adapter, API Budget Manager, Schema Drift Guard and market scanner;
-- notifications/security/permissions;
-- frozen V1 stack;
-- A0-A11 end-to-end acceptance gates;
-- Hive compatibility sequencing.
+## Final closure
+- Pull request: #4
+- Audited head: 1c056801f3056fa50ca3d28261d180b012bab756
+- Governance workflow: run #11 SUCCESS
+- Exact-head COMMENT review: id 5251462702
+- Merge method: squash
+- Merge SHA: 896e802bd452f963a162cbb9965ed298c056f192
+- Final compare before merge: 38 commits ahead / 0 behind
+- Changed files: 109
+- File deletions: 0
+- Product/trading implementation in this Work Order: none
+- Credentials handled: none
+- Trading performed: none
 
-## Final pre-PR audit
-Compare against main found branch ahead and not behind, with no deleted files.
+## Final consistency audit
+Corrected before merge:
+- F-01 stale one-active-strategy text in PROJECT-OVERVIEW;
+- F-02 stale one-active-strategy requirement in Work Order;
+- F-03 roadmap missing DT-DEV-BOOTSTRAP-0001 as first implementation increment;
+- F-04 explicit DT-PLAN Context Lock missing.
 
-Consistency findings corrected before PR:
-- stale one-active-strategy text in PROJECT-OVERVIEW;
-- stale one-active-strategy requirement in DT-PLAN Work Order;
-- build roadmap now begins with DT-DEV-BOOTSTRAP-0001;
-- explicit DT-PLAN final Context Lock added.
+Unresolved CRITICAL/HIGH planning findings: 0.
 
-## Safety
-No application/trading implementation, credential handling or trading occurred in DT-PLAN-0001.
-Live money remains excluded.
+## Accepted baseline
+The accepted baseline covers multi-Runner execution, five strategy families, proposal-aware quantitative validation, scanner/market-data architecture, global risk/concurrency, demo execution/reconciliation, user auth/per-user Deriv connections, SecretStore, complete dashboard/reporting/admin UX, local-first/free-first infrastructure, operational/research data separation, frozen bootstrap stack, security/notifications and A0-A11 acceptance gates.
 
-## Remaining closure evidence
-- PR number/head;
-- governance/CI result;
-- exact-head review;
-- merge SHA;
-- checkpoint promotion on main.
+## Transition
+Planning is closed.
+The next legal Work Order is DT-DEV-BOOTSTRAP-0001.
+No implementation may bypass the normal GEF Work Order -> evidence -> exact-head review -> checkpoint lifecycle.

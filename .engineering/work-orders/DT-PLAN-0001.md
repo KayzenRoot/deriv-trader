@@ -1,5 +1,8 @@
 # Work Order DT-PLAN-0001
 
+STATUS: APPROVED / CLOSED
+PROMOTED CHECKPOINT: DT-CP-0004
+
 OBJECTIVE: Freeze a deliberately short, production-oriented Deriv Trader V1 product/system baseline before implementation.
 
 CONTEXT: DT-CP-0003 planning-ready. Product direction evolved during governed planning to include multi-Runner execution, complete dashboard/reporting, per-user Deriv connections, local-first/free-first architecture, quantitative validation, operational data/research separation and future micro-SaaS ownership boundaries.
@@ -37,4 +40,4 @@ DELIVERABLES: planning/governance pack only.
 
 REVIEW FORMAT: APPROVED / CORRECTION REQUIRED / BLOCKED.
 
-STOP CONDITION: DT-PLAN-0001 may close only after final consistency audit, PR exact-head review, successful merge and checkpoint promotion. No product implementation in this Work Order.
+STOP CONDITION: SATISFIED by PR #4 exact-head review + successful squash merge + DT-CP-0004 promotion.
