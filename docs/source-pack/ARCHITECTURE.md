@@ -1,20 +1,41 @@
 # Architecture
-Status: V1 PLANNING BASELINE; runtime stack still pending DT-ARCH-0001.
 
-Core planes/components:
-1. Market/API Adapter
-2. Eligibility + Proposal/Payout Cache
-3. Market Scanner
-4. Single Active Strategy Runtime
-5. Global Risk & Broker-Safety Gate
-6. Demo Execution + Reconciliation
-7. Dataset/Research/Replay
-8. Audit & Observability
-9. Operator UI
-10. Admin/SaaS Foundation
+Status: V1 PLANNING BASELINE; final versions pinned in DT-ARCH-0001.
 
-Execution path: active symbols/capabilities -> cached/subscribed market state -> eligibility/payout filter -> selected strategy only -> global risk/broker gates -> demo order or skip -> reconciliation/audit.
+## Principles
+LOCAL-FIRST, FREE-FIRST, HIGH_ASSURANCE.
 
-Current Deriv API design must favor subscriptions, connection reuse, pacing and backoff over aggressive polling. Rate limits are external constraints and must remain configuration/discovery driven rather than hard-coded assumptions.
+## Core components
+1. Next.js/React Operator + Admin UI
+2. Local Node.js Trader Worker
+3. Deriv API Adapter
+4. Shared Market Data / Eligibility / Proposal Cache
+5. Payout Pulse Scheduler
+6. Multi-Runner Strategy Runtime
+7. Global Risk Engine + Order Slot Arbiter + Loss Cascade Brake
+8. Demo Execution + Reconciliation
+9. Order Flight Recorder / Audit
+10. PostgreSQL Operational Store
+11. DuckDB + Parquet Research Store
+12. Quant Lab / Backtest Replay
+13. Reporting / Analytics
 
-Governance plane: GEF. Context plane: Hive when healthy. Truth plane: Git + exact-head evidence. LLM output is outside deterministic order-time decision authority unless a future separately approved architecture changes that.
+Execution path:
+Deriv market data -> shared normalized cache -> eligible universe/payout -> independent active Runner -> Edge Gate -> Global Risk/Slot Gate -> final proposal refresh -> demo execution or skip -> reconciliation -> audit/reporting.
+
+## Data placement
+Operational/config/user/order summaries: PostgreSQL/Supabase-compatible.
+High-frequency raw ticks/proposals/research files: local Parquet + DuckDB.
+Hot market/Runner state: bounded in-process memory in V1.
+
+Redis is not mandatory in V1.
+
+## Cloud
+Supabase Free is the preferred early operational cloud database/auth foundation.
+Vercel Hobby may host personal/non-commercial UI previews only under current terms.
+Trading-critical compute remains local in V1.
+
+Governance: GEF.
+Context: Hive when healthy.
+Canonical truth: Git + exact-head evidence.
+LLMs have no order-time decision authority.
