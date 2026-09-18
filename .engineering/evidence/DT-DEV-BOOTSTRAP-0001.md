@@ -247,12 +247,26 @@ or live-broker functionality, evidence complete, PR #5 open and NOT merged.
   vulnerabilities); `git diff --check` GREEN; `npm run validate` GREEN.
 - GitHub CI evidence is recorded separately below; local results above are NOT
   presented as CI results.
-- GitHub CI (PR #5, same branch, no merge): product workflow and governance
-  workflow run IDs on the new exact head are recorded in the final executor
-  report and PR body after push; both must be SUCCESS before stopping. New head
-  SHA is recorded in the final executor report after commit. This file records
-  the code-change basis (implementation head) truthfully; run IDs for the final
-  tip are confirmed via the GitHub UI before the executor stops.
+- GitHub CI (PR #5 https://github.com/KayzenRoot/deriv-trader/pull/5, same
+  branch, no merge) — exact-head results on correction head `23fbae8`:
+  product workflow run `35394420374` (PR #5 synchronize, foundation job):
+  SUCCESS; governance workflow run `35394420373` (PR #5 synchronize,
+  source-pack job): SUCCESS. Both triggered September 18, 2026 ~20:59 UTC on
+  `work/DT-DEV-BOOTSTRAP-0001` at `23fbae8`. Only annotations are pre-existing
+  runner notices (Node 20 action deprecation, ubuntu-latest→26 migration),
+  unrelated to this change. The original failure (product run `35391418811` on
+  `86a2349`, lint step, 24 unsafe-resolution errors from missing `dist`) is
+  resolved: the same lint step is GREEN on the new head with no prebuilt
+  artifacts.
+- Local vs CI separation: the "Local validation" paragraph above is this Windows
+  workspace + a disposable detached Linux-style clean worktree (both Node
+  v24.18.0 / npm 11.16.0); the GitHub CI paragraph above is Ubuntu
+  `ubuntu-latest` on the exact pushed head. Neither is presented as the other.
+- If this file was updated after those runs to record their IDs, that update is
+  an evidence-only commit on the same branch; CI re-runs on the new tip and its
+  run IDs are confirmed SUCCESS via the GitHub UI before stopping (see final
+  executor report). `git diff` between the validated head and the evidence-tip
+  shows evidence markdown only — no product code changes.
 - Disposable clean-worktree proof (head `2187208`, detached worktree, no
   `node_modules`, no `dist`, no `*.tsbuildinfo`): `npm ci` (257 packages) →
   `npm run lint` GREEN immediately with 0 `dist` dirs present (F1 proven, no
