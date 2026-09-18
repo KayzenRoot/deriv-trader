@@ -3,11 +3,15 @@ Status: COLLECTING
 Planning base: DT-CP-0003
 Scope class: product/system planning only.
 
-Latest product clarification incorporated: V1 supports multiple concurrent Strategy Runners, each one strategy + one expiry. User can select combinations across the five strategies and 1m/3m/5m profiles, then Start All.
+Latest clarifications incorporated:
+- multiple concurrent Strategy Runners, each strategy + expiry;
+- global Risk Engine / Order Slot Arbiter with hard simultaneous-order cap;
+- Strategy Control Center and concurrency safety model;
+- Quant Lab and deterministic backtester/replay plan;
+- Runner-level acceptance for up to 15 strategy-expiry profiles;
+- portfolio simulation of shared slot/risk effects without cross-strategy confluence.
 
-A global Risk Engine and Order Slot Arbiter enforce fixed stake/risk settings and a hard max_simultaneous_orders across every Runner. Stale blocked signals are never blindly queued. Concurrency test requirements now explicitly cover simultaneous signals, slot exhaustion, same-instrument collisions, stop/kill races, API rejection, restart and idempotent duplicate starts.
-
-UI planning now includes a dedicated Strategy Control Center and dashboard/reporting attribution by Runner.
+Current Deriv documentation confirms public tick streaming/historical tick access and current proposal fields/compatibility considerations. Historical tick availability is treated as market-data evidence only; exact payout-aware expectancy requires captured proposal economics unless separately reconstructed and proven.
 
 No implementation, credentials, trading or profitability claim.
 Pending: further planning iterations, final consistency audit, governance CI, exact-head review and checkpoint delta.
