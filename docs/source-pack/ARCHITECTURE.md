@@ -8,7 +8,7 @@ LOCAL-FIRST, FREE-FIRST, HIGH_ASSURANCE, USER-ISOLATED, MODULAR-MONOLITH-FIRST.
 ## Frozen V1 technology lines
 - Node.js 24 LTS
 - TypeScript 6.x
-- Next.js 16.2.x Active LTS
+- Next.js 16.3.x Active LTS / security line (reconciled CORRECTION 001; see V1-STACK-FREEZE.md)
 - React 19.2.x
 - Tailwind CSS 4.3.x
 - Motion 13.x

@@ -1,0 +1,28 @@
+{
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "composite": false,
+    "allowJs": false
+  },
+  "references": [
+    { "path": "./packages/domain" },
+    { "path": "./packages/config" },
+    { "path": "./packages/events" },
+    { "path": "./packages/testing" },
+    { "path": "./packages/auth" },
+    { "path": "./packages/connections" },
+    { "path": "./packages/secret-store" },
+    { "path": "./packages/deriv-adapter" },
+    { "path": "./packages/market-data" },
+    { "path": "./packages/scanner" },
+    { "path": "./packages/strategies" },
+    { "path": "./packages/risk" },
+    { "path": "./packages/execution" },
+    { "path": "./packages/db" },
+    { "path": "./packages/research" },
+    { "path": "./packages/reporting" },
+    { "path": "./packages/ui" },
+    { "path": "./apps/trader" }
+  ],
+  "include": []
+}

@@ -1,0 +1,55 @@
+{
+  "name": "@deriv-trader/monorepo",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Deriv Trader V1 foundation monorepo (DT-WP-01). LOCAL-FIRST / FREE-FIRST / DEMO-FIRST.",
+  "type": "module",
+  "engines": {
+    "node": "24.x",
+    "npm": "11.x"
+  },
+  "workspaces": [
+    "apps/web",
+    "apps/trader",
+    "packages/domain",
+    "packages/auth",
+    "packages/connections",
+    "packages/secret-store",
+    "packages/deriv-adapter",
+    "packages/market-data",
+    "packages/scanner",
+    "packages/strategies",
+    "packages/risk",
+    "packages/execution",
+    "packages/events",
+    "packages/db",
+    "packages/research",
+    "packages/reporting",
+    "packages/ui",
+    "packages/config",
+    "packages/testing"
+  ],
+  "scripts": {
+    "check:eol": "node scripts/checks/eol-check.mjs",
+    "check:deps": "node scripts/checks/dep-boundaries.mjs",
+    "check:cycles": "node scripts/checks/cycle-check.mjs",
+    "lint": "eslint . --max-warnings=0",
+    "typecheck": "tsc --build tsconfig.json",
+    "test": "vitest run",
+    "build": "tsc --build tsconfig.json",
+    "build:workspaces": "npm run build --workspaces --if-present",
+    "audit:high": "npm audit --audit-level=high",
+    "validate": "npm run check:eol && npm run check:deps && npm run check:cycles && npm run lint && npm run typecheck && npm run test && npm run build",
+    "ci": "npm run check:eol && npm run check:deps && npm run check:cycles && npm run lint && npm run typecheck && npm run test && npm run build"
+  },
+  "devDependencies": {
+    "@eslint/js": "10.0.1",
+    "@types/node": "24.13.5",
+    "eslint": "10.10.0",
+    "globals": "17.12.0",
+    "playwright": "1.55.1",
+    "typescript": "6.0.3",
+    "typescript-eslint": "8.70.0",
+    "vitest": "5.0.1"
+  }
+}

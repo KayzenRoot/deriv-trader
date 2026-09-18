@@ -1,11 +1,58 @@
+# Env / secrets (never commit real credentials)
 .env
 .env.*
 !.env.example
-node_modules/
-dist/
-coverage/
-*.log
-.DS_Store
-Thumbs.db
 secrets/
 credentials/
+*.pem
+*.key
+
+# Dependencies
+node_modules/
+
+# Builds
+dist/
+build/
+.next/
+out/
+*.tsbuildinfo
+tsconfig.tsbuildinfo
+next-env.d.ts
+
+# Coverage / test output
+coverage/
+.nyc_output/
+test-results/
+playwright-report/
+playwright/.cache/
+
+# Logs
+*.log
+logs/
+npm-debug.log*
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/*
+!.vscode/extensions.json
+.idea/
+
+# Supabase local artifacts
+.supabase/
+supabase/.branches/
+supabase/.temp/
+
+# Local data runtime (keep intentional fixtures only)
+data/*.parquet
+data/*.duckdb
+data/*.db
+data/*.sqlite
+data/runtime/
+data/tmp/
+!data/.gitkeep
+
+# Misc
+.cache/
+.tmp/
+*.tmp

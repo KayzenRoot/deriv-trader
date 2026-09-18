@@ -1,0 +1,22 @@
+{
+  "name": "@deriv-trader/config",
+  "version": "0.1.0",
+  "description": "Typed application configuration and environment validation (no secrets).",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": ["dist"],
+  "scripts": {
+    "build": "tsc --build",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@deriv-trader/domain": "0.1.0",
+    "zod": "4.6.5"
+  },
+  "devDependencies": {
+    "typescript": "6.0.3",
+    "vitest": "5.0.1"
+  }
+}

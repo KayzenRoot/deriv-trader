@@ -1,0 +1,19 @@
+{
+  "name": "@deriv-trader/domain",
+  "version": "0.1.0",
+  "description": "Deriv Trader V1 typed domain vocabulary (broker-agnostic). No economic order implementation.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": ["dist"],
+  "scripts": {
+    "build": "tsc --build",
+    "test": "vitest run",
+    "lint": "eslint src --max-warnings=0",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "typescript": "6.0.3",
+    "vitest": "5.0.1"
+  }
+}

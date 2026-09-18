@@ -1,0 +1,21 @@
+{
+  "name": "@deriv-trader/market-data",
+  "version": "0.1.0",
+  "description": "Market-data types/interfaces for later DT-WP-02 implementation.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": ["dist"],
+  "scripts": {
+    "build": "tsc --build",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@deriv-trader/domain": "0.1.0"
+  },
+  "devDependencies": {
+    "typescript": "6.0.3",
+    "vitest": "5.0.1"
+  }
+}

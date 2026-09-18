@@ -1,6 +1,7 @@
 # V1 Stack Freeze
 
-Verified against current official sources on 2026-09-18.
+Verified against current official sources on 2026-09-18; Next.js line reconciled
+against official sources on 2026-09-19 (CORRECTION 001, canonical reconciliation).
 
 ## Runtime
 - Node.js 24 LTS line. Current official LTS patch observed: 24.21.0.
@@ -9,7 +10,7 @@ Verified against current official sources on 2026-09-18.
 Reason: TypeScript 7 is newly available; V1 favors the more mature transition line unless implementation compatibility testing proves 7.x is cleaner.
 
 ## Web
-- Next.js 16.2.x Active LTS line.
+- Next.js 16.3.x Active LTS / security line (exact patch pinned in package-lock.json).
 - React 19.2.x line.
 - Tailwind CSS 4.3.x.
 - Motion 13.x.
@@ -50,7 +51,13 @@ Trading-critical software values predictable support/security behavior over nove
 ## Source verification notes
 Current official references observed:
 - Node 24.21.0 is LTS; Node 26 is Current.
-- Next.js 16.2.11 is Active LTS while 16.3 is newer.
+- Next.js: 16.x is Active LTS per https://nextjs.org/support-policy; the August
+  2026 security release (https://nextjs.org/blog/august-2026-security-release,
+  published August 25th 2026) instructs users to upgrade to 16.3.3 (Active LTS)
+  to address two Critical vulnerabilities (including GHSA-p293-qw3h-jr36 and
+  GHSA-2xp9-vwfh-vxw4). V1 therefore accepts the current 16.3.x Active
+  LTS/security line with the exact patch pinned in package-lock.json (16.3.5 at
+  CORRECTION 001, newer than the instructed 16.3.3 within the same line).
 - React 19.3 is latest, but V1 intentionally stays on the mature 19.2 line with Next Active LTS.
 - Tailwind CSS 4.3 is current published major/minor.
 - Fastify docs show latest 5.12.5.

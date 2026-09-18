@@ -1,0 +1,22 @@
+{
+  "name": "@deriv-trader/risk",
+  "version": "0.1.0",
+  "description": "Risk gate interfaces and decision types. Full engine arrives in later WP.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": ["dist"],
+  "scripts": {
+    "build": "tsc --build",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@deriv-trader/domain": "0.1.0"
+  },
+  "devDependencies": {
+    "@deriv-trader/testing": "0.1.0",
+    "typescript": "6.0.3",
+    "vitest": "5.0.1"
+  }
+}

@@ -1,0 +1,21 @@
+{
+  "name": "@deriv-trader/secret-store",
+  "version": "0.1.0",
+  "description": "Canonical SecretStore interface with in-memory/test adapter. Native OS adapters deferred to governed integration module.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": ["dist"],
+  "scripts": {
+    "build": "tsc --build",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@deriv-trader/domain": "0.1.0"
+  },
+  "devDependencies": {
+    "typescript": "6.0.3",
+    "vitest": "5.0.1"
+  }
+}

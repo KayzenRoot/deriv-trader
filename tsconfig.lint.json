@@ -1,0 +1,47 @@
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "composite": false,
+    "noEmit": true,
+    "allowJs": false,
+    "jsx": "react-jsx",
+    "lib": ["ES2023", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "types": ["node"],
+    "baseUrl": ".",
+    "paths": {
+      "@deriv-trader/domain": ["./packages/domain/src/index.ts"],
+      "@deriv-trader/config": ["./packages/config/src/index.ts"],
+      "@deriv-trader/events": ["./packages/events/src/index.ts"],
+      "@deriv-trader/testing": ["./packages/testing/src/index.ts"],
+      "@deriv-trader/auth": ["./packages/auth/src/index.ts"],
+      "@deriv-trader/connections": ["./packages/connections/src/index.ts"],
+      "@deriv-trader/secret-store": ["./packages/secret-store/src/index.ts"],
+      "@deriv-trader/deriv-adapter": ["./packages/deriv-adapter/src/index.ts"],
+      "@deriv-trader/market-data": ["./packages/market-data/src/index.ts"],
+      "@deriv-trader/scanner": ["./packages/scanner/src/index.ts"],
+      "@deriv-trader/strategies": ["./packages/strategies/src/index.ts"],
+      "@deriv-trader/risk": ["./packages/risk/src/index.ts"],
+      "@deriv-trader/execution": ["./packages/execution/src/index.ts"],
+      "@deriv-trader/db": ["./packages/db/src/index.ts"],
+      "@deriv-trader/research": ["./packages/research/src/index.ts"],
+      "@deriv-trader/reporting": ["./packages/reporting/src/index.ts"],
+      "@deriv-trader/ui": ["./packages/ui/src/index.ts"],
+      "@deriv-trader/trader": ["./apps/trader/src/index.ts"],
+      "@/*": ["./apps/web/*"]
+    }
+  },
+  "include": [
+    "packages/*/src/**/*.ts",
+    "apps/trader/src/**/*.ts",
+    "apps/web/*.ts",
+    "apps/web/app/**/*.ts",
+    "apps/web/app/**/*.tsx",
+    "apps/web/lib/**/*.ts",
+    "tests/**/*.ts",
+    "vitest.config.ts",
+    "playwright.config.ts"
+  ]
+}
