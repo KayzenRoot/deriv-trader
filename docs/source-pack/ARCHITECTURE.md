@@ -3,45 +3,49 @@
 Status: V1 PLANNING BASELINE; final versions pinned in DT-ARCH-0001.
 
 ## Principles
-LOCAL-FIRST, FREE-FIRST, HIGH_ASSURANCE.
+LOCAL-FIRST, FREE-FIRST, HIGH_ASSURANCE, USER-ISOLATED.
 
 ## Core components
 1. Next.js/React Operator + Admin UI
 2. Supabase Auth identity/session layer
-3. Per-user Deriv Connection Manager
-4. SecretStore abstraction
-5. Local Node.js Trader Worker
-6. Deriv API Adapter
-7. Shared Market Data / Eligibility / Proposal Cache
-8. Payout Pulse Scheduler
-9. Multi-Runner Strategy Runtime
-10. Global Risk Engine + Order Slot Arbiter + Loss Cascade Brake
-11. Demo Execution + Reconciliation
-12. Order Flight Recorder / Audit
-13. PostgreSQL Operational Store
-14. DuckDB + Parquet Research Store
-15. Quant Lab / Backtest Replay
-16. Reporting / Analytics
+3. RLS-protected operational Postgres
+4. Per-user Deriv Connection Manager
+5. SecretStore abstraction
+6. Local Worker Binding
+7. Local Node.js Trader Worker
+8. Deriv API Adapter
+9. Shared Market Data / Eligibility / Proposal Cache
+10. Payout Pulse Scheduler
+11. Multi-Runner Strategy Runtime
+12. Global Risk Engine + Order Slot Arbiter + Loss Cascade Brake
+13. Demo Execution + Reconciliation
+14. Order Flight Recorder / Audit
+15. DuckDB + Parquet Research Store
+16. Quant Lab / Backtest Replay
+17. Reporting / Analytics
 
-## Identity boundary
-Supabase Auth answers: who is the Deriv Trader user?
-Deriv connection answers: which Deriv account/API authority has that user connected?
-These are separate and independently revocable.
+## Identity/ownership
+Supabase Auth identifies the Deriv Trader user.
+user_id is the V1 tenant boundary.
+Every connection/profile/Runner/order/report belongs to one user.
+RLS/backend authorization enforces ownership.
+
+## Local worker
+A local worker installation is explicitly bound to a user. Worker actions remain attributable to that user and cannot silently switch identity.
 
 ## Secrets
-Local V1: OS credential-store SecretStore adapter.
-Hosted future: encrypted server-side SecretStore such as Supabase Vault/KMS-equivalent.
-Operational DB stores secret references/metadata only.
+Local: OS credential store.
+Hosted future: encrypted server-side SecretStore.
+Operational DB stores references/metadata only.
 
-Execution path:
-authenticated user -> selected Deriv connection -> Deriv market data -> eligible universe/payout -> active Runner -> Edge Gate -> Global Risk/Slot Gate -> final proposal refresh -> demo execution or skip -> reconciliation -> audit/reporting.
+## Execution path
+authenticated user -> bound local worker -> selected Deriv connection -> market data -> eligible universe -> active Runner -> Edge Gate -> Global Risk/Slot Gate -> proposal refresh -> demo execution/skip -> reconciliation -> audit/reporting.
 
-## Cloud/data
-Supabase Free: operational Postgres + Auth.
-High-frequency data: local Parquet + DuckDB.
+## Data
+Operational/config/user/order summaries: Supabase/Postgres.
+High-frequency research: local Parquet + DuckDB.
 Hot state: bounded in-process memory.
 Redis not mandatory.
-Vercel Hobby: personal/non-commercial preview only.
 
 Governance: GEF.
 Context: Hive when healthy.

@@ -1,21 +1,41 @@
 # V1 Admin & Future Micro-SaaS Foundation
 
 ## V1 admin
-- user records and status;
-- role foundation: operator/admin;
-- global configuration defaults;
-- strategy availability flags;
+- users and status;
+- roles: user/admin;
 - feature flags;
-- system health;
+- strategy/Runner availability;
+- system defaults;
+- health;
+- local worker instances/last seen;
 - scan/job monitoring;
-- audit-log viewer;
+- audit viewer;
 - error/event viewer;
-- environment status;
-- read-only broker/API health information;
+- environment state;
+- broker/API connection health metadata;
 - user risk-profile inspection without exposing secrets.
 
-## SaaS-ready but not fully implemented
-Data ownership boundaries, tenant_id-compatible domain design where cheap, feature entitlements, plan hooks, usage counters and audit identity.
+## Ownership model
+user_id is the V1 tenant boundary.
+
+All user-owned records are isolated by RLS/ownership rules from day one. This avoids retrofitting tenant ownership later.
+
+## SaaS-ready now
+- user-scoped domain model;
+- worker installation binding;
+- connection ownership;
+- entitlement/feature-flag hooks;
+- usage counters;
+- audit identity;
+- plan field/hooks can be added without changing trading domain keys.
 
 ## Deferred
-Billing, subscriptions, teams/organizations, reseller/white-label, full tenant isolation infrastructure, self-service onboarding and commercial analytics.
+- billing/subscriptions;
+- organizations/teams;
+- reseller/white-label;
+- shared team accounts;
+- hosted worker fleet;
+- full commercial analytics.
+
+## Rule
+Do not build multi-organization complexity in V1. Preserve extension points, not unused enterprise machinery.
