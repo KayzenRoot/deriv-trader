@@ -1,51 +1,39 @@
 # V1 Reporting & Analytics
 
-## Report periods
-Preset filters: 1 day, 2 days, 7 days, 15 days, 30 days.
-Custom range: user chooses start date and end date.
+## Periods
+Today, 2d, 7d, 15d, 30d and custom date range.
 
 ## Report contents
-Every report can include:
-- period summary;
 - net PnL;
 - gross profit/loss;
-- total stake/invested;
+- total invested;
 - total returned;
 - order count;
-- win/loss count;
+- wins/losses;
 - win rate;
 - average stake;
 - average payout;
 - max drawdown;
-- consecutive win/loss sequences;
-- selected strategy;
-- instrument breakdown;
-- expiry breakdown;
-- day/hour breakdown;
-- risk-stop events;
-- skipped/blocked orders by reason;
-- scanner/API availability notes where relevant.
+- consecutive wins/losses;
+- strategy family;
+- exact Runner: strategy + expiry;
+- instrument/expiry/time breakdowns;
+- slot-cap blocks;
+- risk stops;
+- skipped signals by reason;
+- scanner/API availability notes.
 
 ## Filters
-- date range;
-- strategy;
-- instrument;
-- expiry;
-- result: win/loss/open/cancelled/error;
-- demo/live environment when live exists in the future.
+Date range, strategy family, Runner, instrument, expiry, result, environment.
 
-## Output formats
-V1 should support on-screen report and export-ready data. Preferred deliverables:
-- PDF summary report;
-- CSV detail export;
-- future: XLSX.
+## Output
+- on-screen report;
+- PDF summary;
+- CSV detail;
+- future XLSX.
 
-## Data sources
-Primary canonical source: Deriv Trader reconciled event/audit database.
-Broker enrichment/verification can use authenticated account endpoints such as profit_table and statement when available and permitted.
+## Reconciliation
+Never silently mix unresolved local events with broker-confirmed results. Every order carries reconciliation status.
 
-## Reconciliation rule
-A report must never silently mix unreconciled local events with broker-confirmed outcomes. Every record should carry reconciliation status.
-
-## Performance requirement
-Common periods (today/7d/15d/30d) should be served from indexed aggregates/cache where useful, while retaining drill-down to raw reconciled events.
+## Multi-Runner attribution
+All reports must distinguish the same strategy running at different expiries. Trend Pulse 1m and Trend Pulse 5m are separate analytical dimensions even though they share a strategy family.

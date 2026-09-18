@@ -1,114 +1,71 @@
 # V1 User Dashboard — Complete Performance Center
 
-The user dashboard is a complete operational and performance center, not a lightweight status page.
+The dashboard is both a performance center and the live operating cockpit.
 
-## Primary goals
-The user must understand, at a glance:
-- current account/environment state;
-- profit/loss today and selected period;
-- number of orders opened;
-- total amount invested;
-- average amount per order;
-- winning and losing orders;
-- win rate;
-- net PnL;
-- gross profit and gross loss;
-- current drawdown;
-- current daily risk budget remaining;
-- selected strategy;
-- active payout threshold;
-- enabled expiry windows;
-- currently open orders;
-- scanner health and eligible opportunities.
+## At-a-glance state
+- current environment;
+- active Runner count;
+- Runner states by strategy + expiry;
+- simultaneous slots used / total;
+- open orders;
+- scanner health;
+- API health;
+- payout threshold;
+- fixed stake;
+- daily risk remaining;
+- kill-switch state;
+- PnL today and selected period.
 
 ## Global date filter
-Every analytics component must react to one shared period selector:
-- Today
-- Yesterday
-- Last 2 days
-- Last 7 days
-- Last 15 days
-- Last 30 days
-- Custom date range
-- Future extension: month-to-date / all-time
+Today, Yesterday, 2d, 7d, 15d, 30d and custom range.
 
-Custom date ranges must be timezone-aware and show the exact start/end period used.
+## KPI strip
+Net PnL, gross profit, gross loss, total invested, total returned, orders, wins, losses, win rate, average stake, average payout, max drawdown, balance when available, daily loss usage and target progress.
 
-## Top KPI strip
-Required cards:
-1. Net profit/loss
-2. Gross profit
-3. Gross loss
-4. Total invested
-5. Total returned/payout received
-6. Orders opened
-7. Winning orders
-8. Losing orders
-9. Win rate
-10. Average stake
-11. Average payout
-12. Max drawdown for period
-13. Current balance when broker/account data is available
-14. Daily loss limit usage
-15. Daily target progress when configured
-
-Each KPI must expose comparison versus the immediately preceding equivalent period where meaningful.
+## Runner analytics
+Dashboard must support:
+- PnL by Runner;
+- win rate by Runner;
+- order count by Runner;
+- average payout by Runner;
+- results by strategy family;
+- results by expiry;
+- blocked signals by reason;
+- slot-cap blocks;
+- risk-stop events.
 
 ## Required charts
-- cumulative PnL over time;
-- profit/loss by day;
-- invested amount by day;
-- order count by day;
-- wins vs losses;
-- win rate trend;
-- drawdown curve;
-- average payout trend;
-- strategy result history for the selected strategy;
-- results by expiry: 1m / 3m / 5m;
-- results by instrument;
-- results by hour/session;
+- cumulative PnL;
+- daily PnL;
+- invested amount/day;
+- order count/day;
+- win/loss;
+- win-rate trend;
+- drawdown;
+- average payout;
+- Runner performance comparison;
+- expiry performance;
+- instrument performance;
+- hour/session performance;
 - risk-budget usage;
-- optional equity/balance curve when reliable account balance snapshots exist.
+- optional equity curve.
 
-## Activity panels
-- current open orders;
-- most recent closed orders;
-- recent signals;
-- recent risk blocks;
-- recent configuration changes;
-- system/API health;
-- scanner freshness;
-- alert center.
+## Active Runner panel
+Every active Runner shows:
+- strategy name + expiry;
+- RUNNING/PAUSED/ERROR;
+- last signal;
+- signals today;
+- orders today;
+- PnL today;
+- latest blocker/reason;
+- start/stop control shortcut.
 
 ## Drill-down
-Clicking a KPI, chart point, instrument, day or order should open contextual detail where useful:
-- order ID;
-- instrument;
-- direction;
-- strategy;
-- expiry;
-- stake;
-- offered payout;
-- result;
-- net PnL;
-- timestamps;
-- decision/risk reason;
-- configuration version;
-- evidence/replay reference when available.
+Every order exposes exact runner_id, strategy, expiry, stake, payout, result, PnL, timestamps, risk/slot decision, configuration version and replay/evidence reference.
 
-## Visual and motion
-UGAS must provide the visual language for:
-- animated KPI counters;
-- smooth chart transitions;
-- glass panels;
-- hover/focus detail;
-- skeleton loading;
-- subtle scanner pulse;
-- order lifecycle animation;
-- success/loss/risk-state transitions;
-- empty/stale/error states.
-
-Animations must be restrained, performant and must never delay or obscure safety-critical state.
+## Motion
+UGAS defines animated KPI counters, chart transitions, Runner state transitions, slot usage animations, scanner pulse and order lifecycle motion. Motion must never obscure safety state.
 
 ## Data integrity
-Dashboard analytics are derived from Deriv Trader's own reconciled audit/event store. Broker account endpoints may enrich/verify account history, but strategy attribution, risk-block reasons and configuration-version reporting come from our own canonical records.
+Analytics derive from reconciled canonical events. Broker history enriches/verifies, but Runner attribution and internal risk/decision reasoning come from Deriv Trader.
