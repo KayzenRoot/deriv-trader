@@ -1,40 +1,26 @@
 # V1 Dataset & Provenance Contract
 
 ## Canonical datasets
-1. Historical market dataset from official Deriv market-data endpoints.
-2. Prospective tick stream capture.
-3. Prospective proposal/payout capture.
-4. Demo execution/reconciliation dataset.
+1. official historical market data imports;
+2. prospective tick stream capture;
+3. prospective proposal/payout capture;
+4. demo execution/reconciliation dataset;
+5. derived feature/backtest datasets.
 
-## Required metadata
-- symbol/instrument;
-- source endpoint;
-- collection timestamps;
-- event timestamps;
-- source/API version assumptions;
-- raw payload hash where retained;
-- parser/schema version;
-- normalization version;
-- missing/gap markers;
-- dataset partition;
-- Git SHA / collector version.
+## Dataset Passport
+Every acceptance-grade dataset has an immutable manifest with source, versions, files, hashes, time range, symbols, row counts, data-quality summary and Git SHA.
 
 ## Historical market data
-Official Deriv ticks_history provides historical tick data and can support market-only signal replay. It does not automatically establish historical proposal/payout economics.
+Historical ticks can support signal replay but do not establish exact historical payout economics unless exact proposal data is separately captured/proven.
 
 ## Prospective payout data
-Proposal snapshots must capture exact offered economics when fields are available, including ask_price and payout, plus contract parameters and freshness timestamps. Parser must handle current documented number|string representation and nullable/optional non-id fields safely.
+Proposal snapshots capture actual ask_price/payout and contract metadata with timestamps/freshness.
 
 ## Data-quality gates
-Reject/mark:
-- duplicated events;
-- non-monotonic timestamps;
-- gaps beyond policy;
-- schema mismatch;
-- stale proposal;
-- impossible prices;
-- missing contract identity;
-- clock-skew beyond tolerance.
+Duplicates, non-monotonic timestamps, gaps, schema mismatch, stale proposals, impossible values, identity gaps and clock skew are detected and classified.
 
 ## Partitions
-Chronological train/development, validation, untouched test and rolling walk-forward folds. Final test data is never reused for iterative tuning.
+Chronological development, validation, untouched test and rolling walk-forward folds. Final test data is never reused for iterative tuning.
+
+## Evidence rule
+Backtests without a Dataset Passport and DQG pass are exploratory only.

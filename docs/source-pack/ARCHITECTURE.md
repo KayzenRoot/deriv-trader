@@ -13,35 +13,30 @@ One local Node.js/TypeScript Trader Worker exposes a versioned local HTTP + WebS
 2. Supabase Auth + RLS operational Postgres
 3. Per-user Deriv Connection Manager + SecretStore
 4. Local Worker Binding
-5. Deriv Adapter
-6. Public/Auth Connection Supervisors
-7. API Budget Manager
-8. Schema Drift Guard + Error Taxonomy
-9. Symbol & Contract Registry
-10. Shared Market Data Pipeline
-11. Market Freshness Matrix
-12. Payout Pulse Scheduler
-13. Market Eligibility Engine / Opportunity Lattice
-14. Multi-Runner Strategy Runtime
-15. Global Risk Engine + Slot Arbiter + Loss Cascade Brake
-16. Demo Execution + Reconciliation
-17. Event/Audit + Order Flight Recorder
+5. Deriv Adapter + Connection Supervisors
+6. API Budget Manager + Schema Drift Guard
+7. Symbol/Contract Registry + Market Data Pipeline
+8. Market Freshness Matrix + Payout Pulse + Eligibility
+9. Multi-Runner Strategy Runtime
+10. Global Risk Engine + Slot Arbiter + Loss Cascade Brake
+11. Demo Execution + Reconciliation
+12. Event/Audit + Order Flight Recorder
+13. Operational Postgres
+14. Local Capture Writer
+15. Parquet Research Store
+16. DuckDB Quant/Replay Engine
+17. Dataset Passport + Data Quality Gate
 18. Reporting/Analytics
-19. DuckDB + Parquet Quant Lab/Replay
 
-## External API boundary
-Prefer current Deriv Options API. Legacy compatibility, if required, stays behind the adapter.
-Public market-data and authenticated demo/real sockets are separate.
-Strategies/UI never consume raw Deriv payloads.
-
-## Execution path
-authenticated user -> bound worker -> authenticated account context -> shared market data -> payout/freshness eligibility -> Runner -> Edge Gate -> Risk/Slot Gate -> fresh proposal -> execution -> reconciliation -> audit.
-
-## Data
-Operational: Supabase/Postgres.
-High-frequency/research: local Parquet + DuckDB.
+## Data placement
+Operational/user/order state: Supabase/Postgres.
+Raw/high-frequency market, proposal and research data: local Parquet.
+Analytical queries/backtests: DuckDB.
 Hot state: bounded memory.
 Redis not mandatory.
+
+## Evidence
+Acceptance-grade quant results require an immutable Dataset Passport plus Data Quality Gate pass.
 
 Governance: GEF.
 Context: Hive when healthy.
