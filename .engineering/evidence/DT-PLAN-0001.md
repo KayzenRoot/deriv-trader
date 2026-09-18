@@ -3,18 +3,16 @@ Status: COLLECTING
 Planning base: DT-CP-0003
 Scope class: product/system planning only.
 
-Latest planning additions:
-- complete Global Risk Engine;
-- hard simultaneous-order and open-exposure caps;
-- daily loss/optional target controls;
-- consecutive-loss and cooldown controls;
-- explicit risk state machine;
-- machine-readable risk reason codes;
-- Risk Center UX;
-- Loss Cascade Brake for clustered-loss protection;
-- dedicated risk/concurrency test matrix.
-
-Loss Cascade Brake is strictly an admission/risk regulator and does not combine strategy signals or choose direction.
+Planning now covers:
+- multi-Runner strategy model;
+- independent 1m/3m/5m validation;
+- Quant Lab/backtester;
+- Global Risk Engine and Loss Cascade Brake;
+- deterministic Runner Admission Scheduler;
+- demo execution lifecycle;
+- proposal refresh / risk reservation / idempotent purchase / reconciliation;
+- Order Flight Recorder evidence trail;
+- execution/concurrency/risk test matrices.
 
 No implementation, credentials, trading or profitability claim.
 Pending: further planning iterations, final consistency audit, governance CI, exact-head review and checkpoint delta.
