@@ -1,0 +1,45 @@
+name: product
+on:
+  pull_request:
+  push:
+    branches: [main, "work/*"]
+jobs:
+  foundation:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+      - name: Install (clean, lockfile)
+        run: npm ci
+      - name: EOL policy check
+        run: npm run check:eol
+      - name: Package boundary check
+        run: npm run check:deps
+      - name: Cycle check
+        run: npm run check:cycles
+      - name: Lint
+        run: npm run lint
+      - name: Typecheck (builds packages + trader)
+        run: npm run typecheck
+      - name: Unit tests
+        run: npm run test
+      - name: Build
+        run: npm run build
+      - name: Web production build
+        run: npm --workspace @deriv-trader/web run build
+      - name: Trader smoke (health endpoint)
+        run: |
+          npm --workspace @deriv-trader/trader run build
+          (npm --workspace @deriv-trader/trader run start -- --port 3101 &>/tmp/trader.log & echo $! > /tmp/trader.pid)
+          for i in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:3101/v1/health; then exit 0; fi
+            sleep 1
+          done
+          echo "trader health check failed"; cat /tmp/trader.log || true; exit 1
+      - name: High-severity audit
+        run: npm run audit:high
+      - name: Diff hygiene
+        run: git diff --check

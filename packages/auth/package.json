@@ -1,0 +1,22 @@
+{
+  "name": "@deriv-trader/auth",
+  "version": "0.1.0",
+  "description": "Supabase Auth abstractions and typed auth contracts (skeleton, no live project required).",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": ["dist"],
+  "scripts": {
+    "build": "tsc --build",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@deriv-trader/domain": "0.1.0",
+    "@supabase/supabase-js": "2.116.0"
+  },
+  "devDependencies": {
+    "typescript": "6.0.3",
+    "vitest": "5.0.1"
+  }
+}

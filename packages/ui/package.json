@@ -1,0 +1,24 @@
+{
+  "name": "@deriv-trader/ui",
+  "version": "0.1.0",
+  "description": "Reusable neutral components and token foundation only.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": ["dist"],
+  "scripts": {
+    "build": "tsc --build",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@deriv-trader/domain": "0.1.0",
+    "react": "19.2.8"
+  },
+  "devDependencies": {
+    "@types/node": "24.13.5",
+    "@types/react": "19.2.18",
+    "typescript": "6.0.3",
+    "vitest": "5.0.1"
+  }
+}

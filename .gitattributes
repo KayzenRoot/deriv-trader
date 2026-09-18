@@ -1,0 +1,53 @@
+# Deriv Trader — explicit EOL policy (DT-HIVE-0001 / DT-WP-01)
+# Prevent Windows-host / Linux-container false-dirty conditions.
+# Prefer LF for source/config/docs/scripts; allow Windows-only scripts CRLF.
+
+* text=auto eol=lf
+
+# Source
+*.ts text eol=lf
+*.tsx text eol=lf
+*.mts text eol=lf
+*.cts text eol=lf
+*.js text eol=lf
+*.mjs text eol=lf
+*.cjs text eol=lf
+*.json text eol=lf
+*.jsonc text eol=lf
+
+# Styles / web
+*.css text eol=lf
+*.html text eol=lf
+*.svg text eol=lf
+
+# Docs / config
+*.md text eol=lf
+*.mdx text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+*.toml text eol=lf
+*.ini text eol=lf
+*.sql text eol=lf
+*.sh text eol=lf
+*.env.example text eol=lf
+.editorconfig text eol=lf
+.gitattributes text eol=lf
+.gitignore text eol=lf
+
+# Windows-only scripts keep CRLF where the host expects it
+*.bat text eol=crlf
+*.cmd text eol=crlf
+*.ps1 text eol=crlf
+
+# Binary / runtime artifacts (never normalized)
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.webp binary
+*.ico binary
+*.woff binary
+*.woff2 binary
+*.parquet binary
+*.duckdb binary
+*.db binary
+*.sqlite binary
