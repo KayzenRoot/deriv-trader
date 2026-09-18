@@ -12,14 +12,18 @@ ADR-0010 ACCEPTED: payout/break-even use actual proposal economics.
 ADR-0011 ACCEPTED: multiple concurrent Strategy Runners; one Runner = one strategy + one expiry.
 ADR-0012 ACCEPTED: signals blocked by full slot capacity are not blindly queued.
 ADR-0013 ACCEPTED: duplicate identical Runners are prevented.
-ADR-0014 ACCEPTED: V1 architecture is LOCAL-FIRST and FREE-FIRST. Trading-critical compute remains local during V1 research/demo.
-ADR-0015 ACCEPTED: Supabase Free is the preferred early operational Postgres/Auth cloud foundation, subject to re-checking current quotas before deployment.
-ADR-0016 ACCEPTED: high-frequency tick/proposal research data stays out of the small cloud operational DB and uses local Parquet + DuckDB in V1.
+ADR-0014 ACCEPTED: V1 architecture is LOCAL-FIRST and FREE-FIRST.
+ADR-0015 ACCEPTED: Supabase Free is the preferred early operational Postgres/Auth cloud foundation.
+ADR-0016 ACCEPTED: high-frequency research data uses local Parquet + DuckDB.
 ADR-0017 ACCEPTED: Redis is not mandatory in V1.
 ADR-0018 ACCEPTED: Vercel Hobby is development/preview only under current terms.
 ADR-0019 ACCEPTED: recurring infrastructure spend targets $0 during V1 development.
-ADR-0020 ACCEPTED: Supabase Auth is the V1 identity provider. Privy is not selected because V1 does not need embedded-wallet infrastructure and its current free MAU tier is much smaller.
-ADR-0021 ACCEPTED: Deriv Trader identity and Deriv broker authentication are separate. Every logged-in user owns their own Deriv connection configuration.
-ADR-0022 ACCEPTED: local V1 prefers user-supplied Deriv PAT + App ID stored in the local OS credential store; hosted web/SaaS prefers Deriv OAuth 2.0 + PKCE when the current documented token lifecycle is suitable.
-ADR-0023 ACCEPTED: broker secrets are accessed only through a SecretStore abstraction. Plaintext tokens are never stored in normal operational tables or returned to the browser after save.
-ADR-0024 ACCEPTED: connecting a real Deriv account never bypasses the project REAL execution gate.
+ADR-0020 ACCEPTED: Supabase Auth is the V1 identity provider.
+ADR-0021 ACCEPTED: Deriv Trader identity and Deriv broker authentication are separate and per-user.
+ADR-0022 ACCEPTED: local V1 prefers PAT + App ID; hosted SaaS prefers OAuth 2.0 + PKCE after current-doc verification.
+ADR-0023 ACCEPTED: broker secrets are accessed only through SecretStore.
+ADR-0024 ACCEPTED: connecting a real account never bypasses the REAL execution gate.
+ADR-0025 ACCEPTED: new V1 code prefers the current Deriv Options API. Any legacy API use requires an explicit adapter exception with contract tests.
+ADR-0026 ACCEPTED: public market-data and authenticated account-trading transports are separated. Authenticated Options WebSockets are acquired through the current account-specific short-lived OTP flow.
+ADR-0027 ACCEPTED: Deriv API schemas are never consumed directly by strategies/UI; all payloads pass through typed normalization and Schema Drift Guard.
+ADR-0028 ACCEPTED: request capacity is governed by an API Budget Manager with reserved capacity for execution/reconciliation.

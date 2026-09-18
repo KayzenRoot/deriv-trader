@@ -3,20 +3,18 @@ Status: COLLECTING
 Planning base: DT-CP-0003
 Scope class: product/system planning only.
 
-Market-data/scanner planning updated against current official Deriv documentation on 2026-09-18.
+Current Deriv API planning was re-checked against official documentation on 2026-09-18.
 
-Verified current facts:
-- active_symbols is public/no-auth and returns current active underlying markets;
-- contracts_for is public/no-auth and returns contracts available for a symbol;
-- ticks supports live per-symbol subscriptions;
-- ticks_history supports historical market data;
-- proposal is public/no-auth for pricing/proposal flow;
-- current WebSocket shared budget for proposal + proposal_open_contract + buy + sell is 360/minute and 14,400/hour;
-- all other WebSocket calls are currently documented at 220/minute and 14,400/hour;
-- Deriv recommends subscriptions over polling, connection reuse, burst control and backoff;
-- current new API renamed legacy symbol fields/parameters to underlying_symbol in key endpoints and has documented breaking changes.
+Additional verified facts:
+- current Options API documents a public read-only WebSocket without auth;
+- authenticated Options WebSockets use an account-specific OTP/URL obtained through REST;
+- OTP is currently documented as single-use and valid for 120 seconds;
+- PAT-authenticated OTP REST requests require Deriv-App-ID;
+- Deriv best practices recommend one reused/multiplexed socket, req_id correlation, subscription cleanup, exponential backoff + jitter and explicit error checks;
+- current API has documented legacy/new breaking changes, reinforcing typed adapter normalization;
+- OAuth reference documents Authorization Code + PKCE; workflow documentation references refresh-token handling, so renewal behavior will be re-verified at implementation rather than relying on an earlier static assumption.
 
-Planning artifacts now specify a shared Market Data Pipeline, Symbol/Contract Registry, Market Freshness Matrix, Payout Pulse Scheduler, Opportunity Lattice, Connection Supervisor and scanner test matrix.
+Planning now includes Deriv Adapter, API Budget Manager, Schema Drift Guard, Error Taxonomy and contract-test plan.
 
 No infrastructure provisioned, credentials handled or trading performed.
 Pending: further planning iterations, final consistency audit, governance CI and exact-head review.

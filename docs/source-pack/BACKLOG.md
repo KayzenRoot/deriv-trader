@@ -4,27 +4,27 @@
 - DT-PLAN-0001 — freeze V1 product/system baseline.
 - DT-UX-0001 — UGAS identity/design system.
 - DT-ARCH-0001 — pin runtime stack/repository architecture.
-- DT-API-0001 — Deriv adapter, connection supervisor and current-schema contract tests.
+- DT-API-0001 — current Deriv Options adapter, public/auth connection supervisors, OTP flow, API Budget Manager, Schema Drift Guard, error taxonomy and contract tests.
 - DT-DATA-0001 — Parquet/DuckDB market/proposal capture + operational schema.
-- DT-SCANNER-0001 — Symbol/Contract Registry + shared Market Data Pipeline + Market Freshness Matrix + Payout Pulse Scheduler + Eligibility Engine.
-- DT-STRAT-0001 — validate five strategy families / expiry Runners.
+- DT-SCANNER-0001 — Registry + Market Data Pipeline + Freshness + Payout Pulse + Eligibility.
+- DT-STRAT-0001 — validate strategy/expiry Runners.
 - DT-RISK-0001 — risk engine.
 - DT-EXEC-DEMO-0001 — demo execution/reconciliation.
 - DT-DASH-0001 — dashboard/reporting.
-- DT-ADMIN-0001 — admin/SaaS-ready foundation.
+- DT-ADMIN-0001 — admin/SaaS foundation.
 - DT-HIVE-COMPAT-0001 — Hive compatibility debt.
 
 ## IMPORTANT
-- API-budget telemetry and tuning;
-- proposal-subscription cardinality experiments;
+- safe API-budget telemetry/tuning;
+- proposal-subscription experiments;
 - cloud/free-quota telemetry;
-- notifications and richer analytics.
+- notifications/analytics.
 
 ## FUTURE
 - commercial hosting;
 - hosted worker fleet;
-- distributed cache if required;
-- live-money gate/execution;
+- distributed cache;
+- live-money gate;
 - billing/full SaaS.
 
 ## ACCEPTED
