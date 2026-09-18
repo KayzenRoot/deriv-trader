@@ -275,3 +275,24 @@ or live-broker functionality, evidence complete, PR #5 open and NOT merged.
   `build` GREEN; web production build GREEN; trader build + loopback
   `/v1/health` smoke GREEN (`HEALTHY`/`READY`/`DEMO`); `audit:high` GREEN (0
   vulnerabilities); `git diff --check` clean. Worktree removed after proof.
+
+
+## 16. Reviewer tightening — web presentation boundary
+
+During ChatGPT exact-head review after CORRECTION 001, the explicit package
+allowlist was found to remain broader than the canonical
+`V1-REPOSITORY-ARCHITECTURE.md` contract for the web layer.
+
+Reviewer correction on the same PR branch:
+- `web` may import only `domain`, `config`, `auth`, `connections`, and `ui`;
+- `web` must reject direct imports of `market-data`, `scanner`,
+  `strategies`, `risk`, `research`, `reporting`, `db`, `events`,
+  `secret-store`, `deriv-adapter`, `execution`, and `trader`;
+- negative self-tests were expanded accordingly.
+
+Rationale: the presentation app must use API/client contracts rather than
+reaching into Trader Worker service modules directly. This preserves the
+canonical local-worker authority boundary and future SaaS split point.
+
+This reviewer correction introduces no broker calls, credentials, live-money
+scope, or new dependency.

@@ -81,19 +81,14 @@ const ALLOWED = new Map([
   [
     "web",
     [
+      // Presentation boundary: web may consume identity/domain/config and
+      // presentation-safe client contracts only. It must not import worker
+      // service modules such as scanner/risk/strategies/research/db.
       "domain",
       "config",
-      "events",
       "auth",
       "connections",
-      "market-data",
-      "scanner",
-      "strategies",
-      "risk",
-      "reporting",
-      "research",
       "ui",
-      "db",
     ],
   ],
 ]);
@@ -142,6 +137,14 @@ function runSelfTests() {
     ["web", "deriv-adapter"],
     ["web", "execution"],
     ["web", "trader"],
+    ["web", "market-data"],
+    ["web", "scanner"],
+    ["web", "strategies"],
+    ["web", "risk"],
+    ["web", "research"],
+    ["web", "reporting"],
+    ["web", "db"],
+    ["web", "events"],
   ];
   const mustAllow = [
     ["config", "domain"],
