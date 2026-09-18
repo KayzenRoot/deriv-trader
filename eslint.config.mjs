@@ -12,6 +12,7 @@ export default tseslint.config(
       "**/out/**",
       "**/coverage/**",
       "**/*.tsbuildinfo",
+      "**/next-env.d.ts",
       "data/runtime/**",
     ],
   },
@@ -23,14 +24,11 @@ export default tseslint.config(
         ...globals.node,
       },
       parserOptions: {
-        projectService: {
-          allowDefaultProject: [
-            "vitest.config.ts",
-            "playwright.config.ts",
-            "tests/*.test.ts",
-            "eslint.config.mjs",
-          ],
-        },
+        // Dedicated lint project: resolves workspace imports to source via
+        // paths (tsconfig.lint.json), so `npm run lint` passes on a clean
+        // checkout with no dist artifacts. Build/typecheck still use project
+        // references + dist and remain the authority for emit.
+        project: ["./tsconfig.lint.json"],
         tsconfigRootDir: import.meta.dirname,
       },
     },

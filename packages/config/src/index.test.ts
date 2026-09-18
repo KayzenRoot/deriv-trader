@@ -10,6 +10,16 @@ describe("config", () => {
     expect(isLoopbackHost(config.traderHost)).toBe(true);
   });
 
+  it("defaults to the current Options API public surfaces (no legacy endpoint)", () => {
+    const config = loadConfig({});
+    expect(config.derivOptionsRestBaseUrl).toBe("https://api.derivws.com");
+    expect(config.derivOptionsPublicWsUrl).toBe(
+      "wss://api.derivws.com/trading/v1/options/ws/public",
+    );
+    expect(config.derivOptionsPublicWsUrl).not.toContain("websockets/v3");
+    expect(config.derivOptionsPublicWsUrl).not.toBe("wss://ws.derivws.com/websockets/v3");
+  });
+
   it("resolves data root deterministically and safely", () => {
     const repoRoot = "/repo";
     expect(resolveDataRoot({ dataRoot: "./data" }, repoRoot)).toBe("/repo/data");

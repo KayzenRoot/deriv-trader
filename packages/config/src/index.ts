@@ -16,7 +16,10 @@ const envSchema = z.object({
   SUPABASE_URL: z.string().optional().default(""),
   SUPABASE_ANON_KEY: z.string().optional().default(""),
   DERIV_APP_ID: z.string().optional().default(""),
-  DERIV_API_URL: z.string().default("wss://ws.derivws.com/websockets/v3"),
+  DERIV_OPTIONS_REST_BASE_URL: z.string().default("https://api.derivws.com"),
+  DERIV_OPTIONS_PUBLIC_WS_URL: z
+    .string()
+    .default("wss://api.derivws.com/trading/v1/options/ws/public"),
 });
 
 export type AppConfig = {
@@ -29,7 +32,8 @@ export type AppConfig = {
   readonly supabaseUrl: string;
   readonly supabaseAnonKey: string;
   readonly derivAppId: string;
-  readonly derivApiUrl: string;
+  readonly derivOptionsRestBaseUrl: string;
+  readonly derivOptionsPublicWsUrl: string;
 };
 
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
@@ -43,7 +47,8 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     SUPABASE_URL: env["SUPABASE_URL"],
     SUPABASE_ANON_KEY: env["SUPABASE_ANON_KEY"],
     DERIV_APP_ID: env["DERIV_APP_ID"],
-    DERIV_API_URL: env["DERIV_API_URL"],
+    DERIV_OPTIONS_REST_BASE_URL: env["DERIV_OPTIONS_REST_BASE_URL"],
+    DERIV_OPTIONS_PUBLIC_WS_URL: env["DERIV_OPTIONS_PUBLIC_WS_URL"],
   });
   return {
     nodeEnv: parsed.NODE_ENV,
@@ -55,7 +60,8 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     supabaseUrl: parsed.SUPABASE_URL,
     supabaseAnonKey: parsed.SUPABASE_ANON_KEY,
     derivAppId: parsed.DERIV_APP_ID,
-    derivApiUrl: parsed.DERIV_API_URL,
+    derivOptionsRestBaseUrl: parsed.DERIV_OPTIONS_REST_BASE_URL,
+    derivOptionsPublicWsUrl: parsed.DERIV_OPTIONS_PUBLIC_WS_URL,
   };
 }
 

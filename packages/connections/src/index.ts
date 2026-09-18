@@ -21,7 +21,8 @@ export interface DerivConnectionMeta {
 
 export interface DerivConnectionConfig {
   readonly appId: string;
-  readonly apiUrl: string;
+  readonly restBaseUrl: string;
+  readonly publicWsUrl: string;
   readonly environment: Environment;
 }
 

@@ -1,13 +1,15 @@
 #!/usr/bin/env node
 // Package boundary check (DT-WP-01 section 6 + V1-MODULE-DEPENDENCY-AUDIT).
-// Static, dependency-free: scans workspace `from "..."` imports and enforces direction.
+// Explicit allowlist/adjacency policy per workspace — not numeric ranks.
+// Static, dependency-free: scans workspace `from "..."` imports and enforces
+// the canonical allowed relationships, then runs built-in negative self-tests
+// proving forbidden imports are rejected (not just that the repo is clean).
 import { readFileSync, readdirSync, statSync, existsSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
 
-// Map workspace package name -> short package key.
 const WORKSPACES = [
   "apps/web",
   "apps/trader",
@@ -32,34 +34,147 @@ const WORKSPACES = [
   ].map((p) => `packages/${p}`),
 ];
 
-// Layer rank: lower = more foundational. Imports may only flow toward lower ranks
-// (or within the same rank for shared cross-cutting concerns).
-const LAYER = new Map([
-  ["domain", 0],
-  ["config", 1],
-  ["events", 1],
-  ["auth", 2],
-  ["connections", 2],
-  ["secret-store", 2],
-  ["testing", 2],
-  ["market-data", 3],
-  ["scanner", 3],
-  ["strategies", 3],
-  ["risk", 3],
-  ["deriv-adapter", 4],
-  ["execution", 4],
-  ["research", 4],
-  ["reporting", 4],
-  ["db", 4],
-  ["ui", 5],
-  ["trader", 6],
-  ["web", 7],
+/**
+ * Canonical allowed dependencies per workspace key.
+ * Read as: key may import ONLY the listed targets (plus external npm deps).
+ * Anything else — including same-layer crossings like risk -> strategies —
+ * is a violation even if no such import exists in the repo today.
+ */
+const ALLOWED = new Map([
+  ["domain", []],
+  ["config", ["domain"]],
+  ["events", ["domain"]],
+  ["testing", ["domain"]],
+  ["auth", ["domain"]],
+  ["connections", ["domain"]],
+  ["secret-store", ["domain"]],
+  ["market-data", ["domain"]],
+  ["scanner", ["domain", "market-data"]],
+  ["strategies", ["domain", "market-data"]],
+  ["risk", ["domain"]],
+  ["deriv-adapter", ["domain"]],
+  ["execution", ["domain", "risk", "deriv-adapter"]],
+  ["db", ["domain"]],
+  ["research", ["domain", "market-data", "strategies"]],
+  ["reporting", ["domain"]],
+  ["ui", ["domain"]],
+  [
+    "trader",
+    [
+      "domain",
+      "config",
+      "events",
+      "auth",
+      "connections",
+      "secret-store",
+      "deriv-adapter",
+      "market-data",
+      "scanner",
+      "strategies",
+      "risk",
+      "execution",
+      "db",
+      "research",
+      "reporting",
+    ],
+  ],
+  [
+    "web",
+    [
+      "domain",
+      "config",
+      "events",
+      "auth",
+      "connections",
+      "market-data",
+      "scanner",
+      "strategies",
+      "risk",
+      "reporting",
+      "research",
+      "ui",
+      "db",
+    ],
+  ],
 ]);
 
 function keyOfWorkspace(ws) {
   if (ws === "apps/web") return "web";
   if (ws === "apps/trader") return "trader";
   return ws.slice("packages/".length);
+}
+
+function isAllowed(from, to) {
+  const allowed = ALLOWED.get(from);
+  if (allowed === undefined) return false;
+  return allowed.includes(to);
+}
+
+/** Built-in negative verification: forbidden pairs must be rejected. */
+function runSelfTests() {
+  const mustReject = [
+    ["strategies", "risk"],
+    ["strategies", "execution"],
+    ["strategies", "deriv-adapter"],
+    ["strategies", "db"],
+    ["strategies", "ui"],
+    ["strategies", "web"],
+    ["strategies", "secret-store"],
+    ["risk", "strategies"],
+    ["risk", "scanner"],
+    ["risk", "market-data"],
+    ["risk", "ui"],
+    ["risk", "web"],
+    ["risk", "execution"],
+    ["execution", "strategies"],
+    ["execution", "db"],
+    ["execution", "ui"],
+    ["execution", "web"],
+    ["execution", "secret-store"],
+    ["research", "execution"],
+    ["research", "deriv-adapter"],
+    ["research", "risk"],
+    ["research", "secret-store"],
+    ["ui", "secret-store"],
+    ["ui", "deriv-adapter"],
+    ["ui", "execution"],
+    ["web", "secret-store"],
+    ["web", "deriv-adapter"],
+    ["web", "execution"],
+    ["web", "trader"],
+  ];
+  const mustAllow = [
+    ["config", "domain"],
+    ["events", "domain"],
+    ["scanner", "market-data"],
+    ["strategies", "market-data"],
+    ["execution", "risk"],
+    ["execution", "deriv-adapter"],
+    ["research", "strategies"],
+    ["trader", "execution"],
+    ["trader", "risk"],
+    ["web", "ui"],
+    ["web", "domain"],
+  ];
+  let failures = 0;
+  for (const [from, to] of mustReject) {
+    if (isAllowed(from, to)) {
+      console.error(`[dep-boundaries:self-test] FAIL: policy allows forbidden ${from} -> ${to}`);
+      failures += 1;
+    }
+  }
+  for (const [from, to] of mustAllow) {
+    if (!isAllowed(from, to)) {
+      console.error(`[dep-boundaries:self-test] FAIL: policy rejects required ${from} -> ${to}`);
+      failures += 1;
+    }
+  }
+  const total = mustReject.length + mustAllow.length;
+  if (failures > 0) {
+    console.error(`[dep-boundaries:self-test] FAIL: ${failures}/${total} policy self-tests failed`);
+    process.exit(1);
+  }
+  console.log(`[dep-boundaries:self-test] ${total}/${total} policy self-tests passed`);
 }
 
 function* walk(dir) {
@@ -70,7 +185,8 @@ function* walk(dir) {
     if (st.isDirectory()) {
       if (entry === "node_modules" || entry === "dist" || entry === ".next") continue;
       yield* walk(full);
-    } else if (/\.(ts|tsx|mts|js|mjs)$/.test(entry) && !entry.endsWith(".test.")) {
+    } else if (/\.(ts|tsx|mts|js|mjs)$/.test(entry)) {
+      if (/\.test\.(ts|tsx|mts|js|mjs)$/.test(entry)) continue;
       yield full;
     }
   }
@@ -79,80 +195,48 @@ function* walk(dir) {
 const IMPORT_RE = /from\s+["'](@deriv-trader\/[a-z-]+)["']|import\s*\(\s*["'](@deriv-trader\/[a-z-]+)["']\s*\)/g;
 
 function pkgKeyFromImport(spec) {
-  const short = spec.slice("@deriv-trader/".length);
-  return short;
+  return spec.slice("@deriv-trader/".length);
 }
+
+runSelfTests();
 
 const violations = [];
 
 for (const ws of WORKSPACES) {
   const key = keyOfWorkspace(ws);
-  const srcDir = join(ROOT, ws, "src");
-  const fromRank = LAYER.get(key);
-  if (fromRank === undefined) {
-    violations.push(`${ws}: unknown layer rank for key ${key}`);
+  if (!ALLOWED.has(key)) {
+    violations.push(`${ws}: unknown workspace key ${key} (missing allowlist entry)`);
     continue;
   }
-  for (const file of walk(srcDir)) {
-    // apps/web src lives under apps/web/{app,src}; also scan app dir.
-    const content = readFileSync(file, "utf8");
-    let m;
-    while ((m = IMPORT_RE.exec(content)) !== null) {
-      const spec = m[1] ?? m[2];
-      const target = pkgKeyFromImport(spec);
-      const toRank = LAYER.get(target);
-      if (toRank === undefined) {
-        violations.push(`${file}: unknown workspace import ${spec}`);
-        continue;
+  const scanDirs =
+    ws === "apps/web"
+      ? [join(ROOT, ws, "lib"), join(ROOT, ws, "app")]
+      : ws === "apps/trader"
+        ? [join(ROOT, ws, "src")]
+        : [join(ROOT, ws, "src")];
+  for (const srcDir of scanDirs) {
+    for (const file of walk(srcDir)) {
+      const content = readFileSync(file, "utf8");
+      let m;
+      while ((m = IMPORT_RE.exec(content)) !== null) {
+        const spec = m[1] ?? m[2];
+        const target = pkgKeyFromImport(spec);
+        if (!ALLOWED.has(target) && target !== "web" && target !== "trader") {
+          violations.push(`${file}: unknown workspace import ${spec}`);
+          continue;
+        }
+        if (!isAllowed(key, target)) {
+          violations.push(`${file}: ${key} must not depend on ${target} (allowlist)`);
+        }
       }
-      // Same-rank imports are allowed only for shared cross-cutting concerns.
-      // Otherwise imports must point inward (target rank < importer rank).
-      if (toRank > fromRank) {
-        violations.push(
-          `${file}: ${key} (layer ${fromRank}) must not depend outward on ${target} (layer ${toRank})`,
-        );
-      }
-    }
-    // Hard rules independent of rank.
-    if (key === "strategies") {
-      if (/(deriv-adapter|execution).*buy|placeOrder|executeOrder/i.test(content)) {
-        violations.push(`${file}: strategies must not call broker buy/order implementation`);
-      }
-      if (content.includes("@deriv-trader/deriv-adapter") && /buy|order/i.test(content)) {
-        // Soft flag only when buy/order tokens appear alongside the import.
-        violations.push(`${file}: strategies must not import broker order path`);
-      }
-    }
-    if (key === "ui" || key === "web") {
-      if (content.includes("@deriv-trader/secret-store")) {
-        violations.push(`${file}: UI/web must not import SecretStore`);
-      }
-    }
-    if (key === "risk" && content.includes("@deriv-trader/ui")) {
-      violations.push(`${file}: risk must not depend on UI state`);
-    }
-    if (key === "research") {
-      if (content.includes("@deriv-trader/execution") && /buy|sell|placeOrder|execute/i.test(content)) {
-        violations.push(`${file}: research cannot emit economic orders`);
-      }
-    }
-  }
-  // apps/web also has app/ dir (Next App Router).
-  if (ws === "apps/web") {
-    for (const extra of [join(ROOT, ws, "app")]) {
-      for (const file of walk(extra)) {
-        const content = readFileSync(file, "utf8");
-        if (content.includes("@deriv-trader/secret-store")) {
+      if ((key === "ui" || key === "web") && content.includes("@deriv-trader/secret-store")) {
+        if (!violations.some((v) => v.startsWith(file) && v.includes("secret-store"))) {
           violations.push(`${file}: UI/web must not import SecretStore`);
         }
-        let m2;
-        while ((m2 = IMPORT_RE.exec(content)) !== null) {
-          const spec = m2[1] ?? m2[2];
-          const target = pkgKeyFromImport(spec);
-          const toRank = LAYER.get(target);
-          if (toRank !== undefined && toRank > (LAYER.get("web") ?? 7)) {
-            violations.push(`${file}: web must not depend outward on ${target}`);
-          }
+      }
+      if (key === "strategies" && content.includes("@deriv-trader/deriv-adapter")) {
+        if (!violations.some((v) => v.startsWith(file) && v.includes("deriv-adapter"))) {
+          violations.push(`${file}: strategies must not import broker adapter`);
         }
       }
     }
@@ -165,4 +249,4 @@ if (violations.length > 0) {
   process.exit(1);
 }
 
-console.log("[dep-boundaries] package boundaries OK");
+console.log("[dep-boundaries] package boundaries OK (allowlist enforced)");

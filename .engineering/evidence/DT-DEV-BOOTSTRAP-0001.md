@@ -98,11 +98,11 @@ All run from `D:\Projeto Codexx\deriv-trader` on `work/DT-DEV-BOOTSTRAP-0001`:
 
 ## 9. Architecture/package-boundary verification and intentional deviations
 
-- `dep-boundaries.mjs`: GREEN. Layer ranks enforce `domain(0) ← config/events(1) ← auth/connections/secret-store/testing(2) ← market-data/scanner/strategies/risk(3) ← deriv-adapter/execution/research/reporting/db(4) ← ui(5) ← trader(6) ← web(7)`. Hard rules verified: no strategy→broker-buy, no UI/web→SecretStore, no risk→UI, no research→economic-orders.
+- `dep-boundaries.mjs`: GREEN. Explicit per-workspace allowlist (CORRECTION 001 §15/F3) replaces numeric ranks: `strategies`→{domain,market-data} only; `risk`→{domain} only; `execution`→{domain,risk,deriv-adapter} only; `research`→{domain,market-data,strategies} (no economic authority); `ui`→{domain} only; `web` excludes secret-store/deriv-adapter/execution/trader; plus 40 built-in must-reject/must-allow self-tests. Hard rules preserved: no strategy→broker-buy, no UI/web→SecretStore, no risk→UI, no research→economic-orders.
 - `cycle-check.mjs`: GREEN, no workspace cycles.
 - `tsconfig` project references mirror the same direction; `testing` is referenced by strategy/risk/execution tests as an inward (layer 2) test-only dependency.
-- Deviations (judgment per Context Lock, all documented, none weaken governance/security/tests):
-  1. `next` 16.2.12 → 16.3.5: required critical-security fix (audit RCE). Same major (16), minimal minor bump, web build + types + tests re-verified. V1-STACK-FREEZE 16.2.x Active-LTS preference is overridden by the security blocker per autonomous error-handling rules.
+- Deviations/reconciliations (judgment per Context Lock, all documented, none weaken governance/security/tests):
+  1. `next` 16.2.12 → 16.3.5: required critical-security fix (audit RCE). Same major (16), minimal minor bump, web build + types + tests re-verified. Canonically reconciled in CORRECTION 001 §15/F5: V1-STACK-FREEZE.md and source-pack ARCHITECTURE.md now accept the current 16.3.x Active LTS/security line per https://nextjs.org/support-policy and https://nextjs.org/blog/august-2026-security-release.
   2. `madge` removed: `madge@8.0.0` declares `peerOptional typescript ^5.4.4`, conflicting with frozen TS 6.0.3 (`ERESOLVE`). Replaced with dependency-free `cycle-check.mjs` (equivalent `circular` verification, maintainable in CI). No architecture change.
   3. `skipLibCheck:true`: third-party `.d.ts` (`@supabase/*`, `tinybench` via Vitest) require DOM/Web globals while Node packages use ES-only `lib`. Enabling lib-skip is standard and does not relax checks on first-party code (strict + `noUncheckedIndexedAccess` + `exactOptionalPropertyTypes` remain on).
   4. Removed deprecated `esModuleInterop:false` (TS 6 TS5107; will stop functioning in TS 7).
@@ -135,10 +135,121 @@ All run from `D:\Projeto Codexx\deriv-trader` on `work/DT-DEV-BOOTSTRAP-0001`:
 
 ## 14. Final executor verdict candidate
 
-`APPROVED` (pending ChatGPT review) — foundation complete, all required validations green, high-severity audit green after documented security deviation, EOL/boundary/cycle checks green, no secrets or live-broker functionality, evidence complete, PR ready and NOT merged.
+`READY_FOR_REVIEW` (executor verdict; ChatGPT review owns APPROVED) — foundation
+complete after CORRECTION 001, all required validations green locally and clean
+lint-first proven with no dist artifacts, high-severity audit green on the
+canonically reconciled 16.3.x line, EOL/boundary/cycle checks green, no secrets
+or live-broker functionality, evidence complete, PR #5 open and NOT merged.
 
 ---
 
 ### Appendix — dependency direction (enforced)
 
 `domain/contracts ← auth/connections/config/events ← market-data/scanner/strategies/risk ← execution/research/reporting/persistence adapters ← trader orchestration ← web/API presentation`. No circular dependencies. No strategy→broker-buy. No UI→SecretStore. Risk ↛ UI. Research emits no economic orders.
+
+---
+
+## 15. CORRECTION 001 (same branch / PR #5 — CORRECTION_REQUIRED → READY_FOR_REVIEW)
+
+- Reviewed head: `86a2349b03d89beddc189907ea6c64c6ecfb1bd7` (PR #5,
+  https://github.com/KayzenRoot/deriv-trader/pull/5).
+- Original product CI failure: workflow run `35391418811`, lint step on Ubuntu.
+  `npm ci`, EOL, package-boundary and cycle checks passed; `npm run lint`
+  failed with 24 `@typescript-eslint` unsafe-resolution errors in
+  `tests/smoke.test.ts`. Cause: workspace imports (`@deriv-trader/*`) resolved
+  through `package.json` `main` → `dist`, but a clean Linux checkout has no
+  generated `dist` when lint starts, while the local Windows run had build
+  artifacts available. Nothing was hidden or weakened to get local green.
+- PR #5 was opened during review (executor did not create it); this correction
+  continues on `work/DT-DEV-BOOTSTRAP-0001` with normal commits, no merge, no
+  new module, no live-money scope.
+
+### F1 — clean CI typed lint (BLOCKING) — corrected
+
+- Added dedicated `tsconfig.lint.json` extending the strict base with
+  `paths` mapping every `@deriv-trader/*` workspace to its source
+  (`packages/*/src/index.ts`, trader `apps/trader/src/index.ts`) plus `@/*`
+  for web, including all package/app/test/config sources.
+- `eslint.config.mjs` now uses `parserOptions.project: ["./tsconfig.lint.json"]`
+  instead of `projectService` + `allowDefaultProject`, so typed lint resolves
+  workspace types from source and passes immediately after clean `npm ci`
+  with no `dist`. Strict `strictTypeChecked` rules are unchanged; `.mjs`
+  remains `disableTypeChecked`; generated `next-env.d.ts` is eslint-ignored.
+- Proven in this workspace after `npm ci` with all `dist` + `*.tsbuildinfo`
+  removed: `npm run lint` GREEN with zero `dist` present (before any
+  `typecheck`/`build`). Build/typecheck (`tsc --build` project references +
+  `dist`) remain the authority for emit; lint is now independent of them.
+- Local-only note: after manually deleting `dist` dirs, stale `*.tsbuildinfo`
+  files (git-ignored, never committed) made `tsc --build` skip emit and
+  dependents failed with TS2307 until the stale buildinfo was removed; clean
+  CI checkouts never contain buildinfo, so this was a simulation artifact only,
+  recorded here for truthfulness. `npm run typecheck`/`test`/`build` are GREEN
+  after the cleanup.
+
+### F2 — legacy Deriv endpoint (HIGH) — corrected
+
+- Removed `DERIV_API_URL` default `wss://ws.derivws.com/websockets/v3` entirely.
+- `AppConfig` now carries `derivOptionsRestBaseUrl` (default
+  `https://api.derivws.com`) and `derivOptionsPublicWsUrl` (default
+  `wss://api.derivws.com/trading/v1/options/ws/public`); no authenticated
+  socket URL is hardcoded anywhere (authenticated demo/real sockets come from
+  the account OTP response at runtime per V1-DERIV-ADAPTER.md).
+- Updated `packages/deriv-adapter` (`DerivAdapterConfig`: `restBaseUrl` +
+  `publicWsUrl` plus documented defaults) and `packages/connections`
+  (`DerivConnectionConfig`: same shape), `.env.example`
+  (`DERIV_OPTIONS_REST_BASE_URL` / `DERIV_OPTIONS_PUBLIC_WS_URL` with OTP
+  comment), and added a config test asserting the new defaults and rejecting
+  the legacy `websockets/v3` value. No network calls added.
+
+### F3 — boundary checker too permissive (HIGH) — corrected
+
+- Replaced numeric layer ranks with an explicit `ALLOWED` adjacency map per
+  workspace key (see `scripts/checks/dep-boundaries.mjs`): `strategies` may
+  import only `domain`/`market-data`; `risk` only `domain`; `execution` only
+  `domain`/`risk`/`deriv-adapter`; `research` only
+  `domain`/`market-data`/`strategies` (no economic authority); `ui` only
+  `domain`; `web` excludes `secret-store`/`deriv-adapter`/`execution`/`trader`;
+  `trader` excludes `ui`/`web`/`testing`. Test files (`*.test.*`) are excluded
+  from production-boundary scanning.
+- `npm run check:deps` now runs 40 built-in policy self-tests first (29
+  must-reject pairs including risk→strategies/scanner/market-data,
+  strategies→risk/execution/db/ui/web, execution→strategies/db/ui/web,
+  research→execution/adapter/risk, ui/web→secret-store, web→execution/adapter,
+  plus 11 must-allow pairs) and fails if the policy itself is wrong — so the
+  check no longer relies on the repo merely happening to be clean. Result:
+  `40/40 policy self-tests passed` + `package boundaries OK (allowlist
+  enforced)`. Cycle detection (`check:cycles`, dependency-free DFS) is
+  preserved and GREEN.
+
+### F5 — canonical Next.js line stale (IMPORTANT) — reconciled
+
+- Re-verified official pages on 2026-09-19: https://nextjs.org/support-policy
+  lists `16.x (Active LTS)` / `15.x (Maintenance LTS)`; the August 2026
+  security release (https://nextjs.org/blog/august-2026-security-release,
+  August 25th 2026) instructs `npm install next@16.3.3 # for 16.3` to address
+  two Critical vulnerabilities (GHSA-2xp9-vwfh-vxw4 AVIF RCE and
+  GHSA-p293-qw3h-jr36 Windows RCE).
+- Updated `docs/planning/V1-STACK-FREEZE.md` (16.3.x Active LTS/security line,
+  exact patch in lockfile; verification notes cite both pages) and
+  `docs/source-pack/ARCHITECTURE.md` (same line). This is canonical
+  reconciliation, not an unexplained deviation: the 16.3.5 pin (newer than the
+  instructed 16.3.3 within the same Active LTS line) keeps `npm audit` green
+  with exact lockfile pinning and no `latest` ranges.
+
+### F4 — evidence truthfulness (HIGH) — this section
+
+- Local validation (this workspace, Node v24.18.0 / npm 11.16.0, AFTER fixes,
+  lint run BEFORE typecheck/build on a clean `npm ci` with no `dist`):
+  `npm run lint` GREEN; `check:eol` GREEN; `check:deps` GREEN (40/40
+  self-tests); `check:cycles` GREEN; `typecheck` GREEN; `test` GREEN (11 files,
+  23 tests); `build` GREEN; web production build GREEN; trader build + loopback
+  `/v1/health` smoke GREEN (`HEALTHY`/`READY`/`DEMO`); `audit:high` GREEN (0
+  vulnerabilities); `git diff --check` GREEN; `npm run validate` GREEN.
+- GitHub CI evidence is recorded separately below; local results above are NOT
+  presented as CI results.
+- GitHub CI (PR #5, same branch, no merge): product workflow and governance
+  workflow run IDs on the new exact head are recorded in the final executor
+  report and PR body after push; both must be SUCCESS before stopping. New head
+  SHA is recorded in the final executor report after commit. This file records
+  the code-change basis (implementation head) truthfully; run IDs for the final
+  tip are confirmed via the GitHub UI before the executor stops.
