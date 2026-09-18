@@ -3,8 +3,6 @@
 This is a planning contract, not final implementation schema.
 
 ## execution_profile
-- strategy_id: enum of five V1 strategies; exactly one
-- enabled_expiries: subset of [60s, 180s, 300s]
 - minimum_payout_percent: default 80
 - fixed_stake
 - max_stake
@@ -15,6 +13,18 @@ This is a planning contract, not final implementation schema.
 - allowlist / blocklist
 - enabled: boolean
 
+## strategy_runner
+- runner_id
+- strategy_id: enum of five V1 strategy families
+- expiry_seconds: one of [60, 180, 300]
+- enabled
+- runtime_status: STOPPED | STARTING | RUNNING | PAUSED | ERROR
+- strategy_version
+- preset_version
+- created_at / updated_at
+
+Unique constraint in V1: execution_profile + strategy_id + expiry_seconds.
+
 ## risk_profile
 - daily_max_loss
 - daily_profit_target_optional
@@ -24,8 +34,9 @@ This is a planning contract, not final implementation schema.
 - pause_new_entries
 - reset_boundary/timezone policy
 
-## system-controlled, not user-overridable below safety minimum
+## system-controlled
 - data freshness thresholds
+- global order-slot arbitration
 - API pacing/backoff
 - idempotency
 - environment isolation
@@ -34,4 +45,4 @@ This is a planning contract, not final implementation schema.
 - secret handling
 - audit logging
 
-Every configuration mutation must be versioned/auditable and tied to the decisions that used it.
+Every configuration mutation and Runner start/stop event must be versioned/auditable.

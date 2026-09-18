@@ -1,32 +1,31 @@
 # V1 Functional Modules
 
 ## M1 — Market Eligibility Scanner
-Continuously discovers currently active/tradable instruments, supported contract/expiry capabilities and current proposal economics. Uses subscriptions/caching where supported instead of aggressive polling.
-Outputs per instrument: tradable state, display name, contract support, eligible expiry windows, effective payout estimate, eligibility reason, freshness timestamp.
+Continuously discovers active/tradable instruments, supported contracts/expiries and current proposal economics. Shared market-data subscriptions/caches feed all Runners.
 
-## M2 — Strategy Selector
-Shows five strategy cards. Exactly one strategy can be active per user/profile. Selection changes are explicit and audited.
+## M2 — Strategy Runner Manager
+Shows five strategy families and independently selectable 1m/3m/5m profiles. Creates, starts, stops, pauses and displays multiple concurrent Runners.
 
-## M3 — Selected Strategy Runtime
-Runs only the chosen strategy against all eligible instruments. Emits SIGNAL or NO_SIGNAL with reason, confidence/quality metadata and expiry candidate.
+## M3 — Multi-Runner Strategy Runtime
+Runs every active strategy-expiry Runner independently against the eligible universe. Each emits SIGNAL_CALL, SIGNAL_PUT or NO_SIGNAL with full attribution.
 
-## M4 — Risk & Safety Engine
-Applies user limits after a valid strategy signal and before any order: stake, daily loss stop, optional daily target, max simultaneous orders, max orders per instrument/session, consecutive-loss stop, cooldown, exposure and kill switch.
+## M4 — Global Risk & Order Slot Arbiter
+Applies stake, daily loss stop, optional target, max simultaneous orders, per-instrument cap, consecutive-loss stop, exposure, cooldown and kill switch across all Runners.
 
 ## M5 — Execution / Demo Reconciliation
-V1 targets demo/paper validation first. Every order lifecycle is reconciled against broker state and tied to strategy/config/data snapshot.
+Demo/paper-first. Every order is tied to exact Runner, strategy version, expiry profile, config and market/proposal evidence.
 
 ## M6 — User Performance Dashboard
-Complete command center with real-time operational state, KPI cards, charts, period comparison, open/recent orders, PnL, total invested, win/loss analytics, drawdown, payout analytics, scanner health, risk usage and drill-down.
+Complete command center with active Runner states, open-slot usage, KPI cards, charts, PnL, total invested, win/loss analytics, drawdown, payout analytics, scanner health and drill-down.
 
 ## M7 — Reporting & Historical Analytics
-Preset and custom periods, report generation, instrument/expiry/time breakdowns, risk-event analysis, PDF summary and CSV detail export.
+Preset/custom periods with breakdown by strategy, Runner, expiry, instrument and time.
 
 ## M8 — Configuration Center
-User controls payout threshold, stake, expiry windows, risk limits, strategy selection, asset allow/block lists, operating windows and notifications.
+Controls global payout, stake, simultaneous-order cap, risk, per-instrument cap, Runner selection, assets, operating windows and notifications.
 
 ## M9 — Admin Panel
-Users, feature flags, strategy availability, global defaults, system health, audit logs, job/scan monitoring and future SaaS controls.
+Users, feature flags, strategy/Runner availability, defaults, system health, audit logs, job/scan monitoring and future SaaS controls.
 
 ## M10 — Audit & Evidence
-Immutable-style event trail for config changes, strategy selection, signal decision, risk decision, proposal economics, order lifecycle, reconciliation and errors.
+Event trail for config changes, Runner start/stop, strategy decisions, risk/slot decisions, proposals, order lifecycle, reconciliation and errors.

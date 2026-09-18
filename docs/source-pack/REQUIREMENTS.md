@@ -10,13 +10,19 @@ Status: PLANNING / DT-PLAN-0001.
 - No committed secrets.
 - Exact-head test/evidence binding.
 - Hive V1 is optional, health-checked and subordinate to Git.
-- V1 exposes exactly five selectable strategy profiles.
-- A user/profile may have only one active execution strategy at a time.
-- Each strategy must show: canonical name, short plain-language summary, market conditions it follows, entry trigger family, supported expiry windows, and important limitations.
-- Strategy selection must be explicit and user-controlled. The engine must not silently combine the five strategies into a mandatory confluence score.
-- Risk and broker eligibility gates remain global and may block an order even when the selected strategy emits a valid signal.
+- V1 exposes five strategy families, each with independently validated 1m/3m/5m expiry profiles where accepted.
+- Users may start multiple Strategy Runners concurrently.
+- Each Runner is one strategy + one expiry profile.
+- Multiple Runners operate independently. There is no mandatory confluence, voting or consensus among strategies.
+- The user can start/stop each Runner individually and can start/stop all selected Runners as a group.
+- The user configures a global maximum number of simultaneous open orders.
+- The global Risk Engine must enforce that cap across all active Runners.
+- When no global order slot is available, a signal must be skipped or freshly re-evaluated later; stale signals must never be queued and blindly executed.
+- The user configures fixed stake per order in V1, maximum stake, daily stop, optional daily target, max consecutive losses, per-instrument order cap and cooldown.
+- Each strategy must show canonical name, plain-language summary, market behavior followed, entry family, supported expiries and limitations.
+- Risk and broker eligibility gates remain global and may block any Runner signal.
 - The user dashboard must be a complete performance center with charts, motion, KPI summaries, operational state and drill-down.
 - Reporting must support today, 2d, 7d, 15d, 30d and custom date ranges.
-- The user must be able to see total invested, amount per order, total orders, wins/losses, win rate, PnL, drawdown, payout and strategy/instrument/expiry breakdowns.
-- V1 reporting must support exportable PDF summary and CSV detail.
+- Reporting must attribute every order to strategy + expiry Runner.
+- V1 reporting must support PDF summary and CSV detail export.
 - Analytics must use reconciled canonical records and expose stale/unreconciled state instead of silently presenting uncertain numbers.

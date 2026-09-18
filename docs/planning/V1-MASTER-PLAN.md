@@ -4,20 +4,31 @@ Status: PLANNING
 Goal: ship a deliberately short, high-quality first version quickly, validate the core product, then iterate.
 
 ## V1 product promise
-A user selects one of five strategy profiles, configures risk and execution preferences, and the system continuously scans currently tradable eligible instruments. Only opportunities with measured effective payout >= 80% and supported 1m/3m/5m expiries are eligible. The selected strategy alone evaluates entries. Global risk and broker-safety gates can still block execution.
+The user selects one or more Strategy Runners. Each Runner is one validated strategy + one expiry profile: 1m, 3m or 5m. All started Runners scan the same eligible market universe independently and may open orders automatically when their own rules, payout/eligibility checks and global risk gates pass.
+
+Example:
+- Trend Pulse · 1m
+- Trend Pulse · 3m
+- Trend Pulse · 5m
+- Breakout Surge · 3m
+- Anchor Pullback · 5m
+
+These are five independent Runners, even though only three strategy families are represented.
 
 ## V1 pillars
-1. Premium glassmorphism operator UI with Deriv Trader visual identity produced through UGAS.
+1. Premium glassmorphism operator UI with Deriv Trader identity produced through UGAS.
 2. Market scanner over currently active/tradable instruments.
-3. Dynamic payout/eligibility filter, default minimum 80%, user-configurable upward.
-4. Five individually selectable strategy profiles, exactly one active at a time.
-5. 1m, 3m and 5m expiry targets, only where broker contract capabilities allow.
-6. Strong configurable risk engine.
-7. Demo/paper-first execution and complete auditability.
-8. Admin panel and SaaS-ready foundations without building full billing/multi-tenancy yet.
+3. Dynamic payout/eligibility filter, default minimum 80%.
+4. Five strategy families with independent 1m/3m/5m profiles.
+5. Multiple concurrently active Runners with explicit start/stop controls.
+6. Global configurable simultaneous-order cap across all Runners.
+7. Strong configurable Risk Engine.
+8. Demo/paper-first execution and complete auditability.
+9. Admin panel and SaaS-ready foundations.
 
 ## Non-negotiables
-- No mandatory confluence of the five strategies.
+- No mandatory confluence among Runners.
+- No blind delayed execution when order slots are full.
 - No martingale default.
 - No profitability claim without Deriv-specific OOS/demo evidence.
 - No bypassing broker/API limits.

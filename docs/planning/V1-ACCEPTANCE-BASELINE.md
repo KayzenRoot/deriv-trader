@@ -1,33 +1,31 @@
 # V1 Acceptance Baseline
 
-V1 is not accepted merely because UI and order calls work.
-
 ## Product
-- complete dark-first UGAS-derived design system applied consistently;
-- scanner shows current eligibility and freshness;
-- one and only one active strategy per execution profile;
-- clear strategy descriptions and limitations;
+- complete UGAS-derived dark-first design system;
+- scanner shows current eligibility/freshness;
+- multiple strategy-expiry Runners can be selected, started and stopped independently;
+- Start All / Stop All works;
+- global simultaneous-order cap is visible and enforced across all Runners;
+- strategy descriptions/limitations are clear;
 - complete configurable risk center;
-- user dashboard is a full performance center with KPI cards, interactive charts, animations, date presets and custom range;
-- dashboard shows at minimum net PnL, gross P/L, total invested, order counts, wins/losses, win rate, average stake, average payout and drawdown;
-- historical reporting supports 2d, 7d, 15d, 30d and custom date range;
-- report drill-down can reconcile orders to strategy/config/risk evidence;
-- PDF summary and CSV detail export are available;
-- operator dashboard and admin panel usable end to end.
+- dashboard shows active Runner status and slots used/total;
+- complete analytics/reporting and admin panel.
 
 ## Engineering
 - official Deriv API contracts covered by contract tests;
-- subscriptions/caching/backoff respect current API limits;
+- shared subscriptions/caching avoid waste across Runners;
+- deterministic Runner/risk decisions replayable;
+- no global order-cap breach under concurrent signal races;
+- stale signals are never blindly queued for later execution;
 - proposal economics captured with provenance;
-- deterministic strategy/risk decisions replayable from evidence;
-- reporting derives from reconciled canonical events and never hides reconciliation status;
+- reporting attributes every order to exact Runner;
 - no secret leakage;
-- demo environment isolated from any future real environment;
-- reconciliation and idempotency tested;
+- demo environment isolated;
+- reconciliation/idempotency/concurrency tests pass;
 - exact-head CI/evidence green.
 
 ## Quant research
-Each strategy evaluated independently. Acceptance requires leakage-safe walk-forward/OOS evidence, robustness/sensitivity analysis and demo validation. Strategies may be rejected individually.
+Each strategy-expiry profile is evaluated independently. Profiles may be rejected individually.
 
 ## Live
-Live-money is NOT part of this acceptance baseline. A later explicit go-live gate is required.
+Live-money is NOT part of V1 acceptance and requires a later explicit go-live gate.

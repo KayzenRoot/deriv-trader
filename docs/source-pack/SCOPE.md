@@ -1,5 +1,5 @@
 # Scope
-NECESSARY now: GEF/Hive governed planning; Deriv API feasibility; visual identity via UGAS; V1 dashboard/admin/configuration; five individually selectable strategies; 1m/3m/5m execution windows; payout eligibility >=80% subject to measured broker offering; risk engine; data/research architecture; test/benchmark plan; security/risk baseline.
-IMPORTANT later: richer strategy presets, adaptive tuning, SaaS/multi-tenant foundations, monitoring/observability expansion.
+NECESSARY now: GEF/Hive governed planning; Deriv API feasibility; visual identity via UGAS; V1 dashboard/admin/configuration; five strategy families with independently selectable 1m/3m/5m Runners; multiple concurrent Runners; payout eligibility >=80% subject to measured broker offering; global risk/order-slot engine; data/research architecture; test/benchmark plan; security/risk baseline.
+IMPORTANT later: per-Runner advanced overrides, richer presets, adaptive tuning, SaaS/multi-tenant foundations, monitoring/observability expansion.
 FUTURE: live execution after explicit gate, portfolio scaling, additional brokers/markets, ML ensembles, billing and full micro-SaaS commercialization.
-OUT OF SCOPE now: mandatory confluence among all five strategies, dozens of strategies, martingale as a product default, bypassing broker controls, unvalidated live-money execution, profitability claims.
+OUT OF SCOPE now: mandatory confluence among strategies, unlimited duplicate runners, delayed execution of stale queued signals, martingale as a product default, bypassing broker controls, unvalidated live-money execution, profitability claims.

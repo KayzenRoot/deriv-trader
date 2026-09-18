@@ -1,42 +1,34 @@
 # V1 Strategy Engine Contract
 
 ## Independence invariant
-Only the user-selected strategy executes. Other strategies are not consulted.
+Each active Strategy Runner executes independently. Other Runners are not consulted for confirmation or veto.
+
+## Runner identity
+runner_id = strategy_id + expiry_profile + execution_profile identity.
 
 ## Common input envelope
-- instrument identity and current tradability;
-- timestamped tick/derived-bar history with provenance;
-- selected expiry candidate: 60s, 180s or 300s;
-- current proposal economics and freshness;
-- feature snapshot required by that strategy;
-- strategy version;
+- instrument identity/tradability;
+- timestamped market history with provenance;
+- Runner expiry: exactly 60s, 180s or 300s;
+- current proposal economics/freshness;
+- strategy-specific feature snapshot;
+- strategy/preset version;
 - runtime configuration version.
 
 ## Common output
-Every evaluation returns one of SIGNAL_CALL, SIGNAL_PUT or NO_SIGNAL plus:
-- strategy_id/version;
-- instrument;
-- expiry;
-- signal timestamp;
-- feature snapshot hash;
-- internal quality score;
-- empirical probability estimate when calibrated;
-- payout break-even probability;
-- estimated edge when available;
-- reason codes;
-- no-trade reason when applicable.
+Every evaluation returns SIGNAL_CALL, SIGNAL_PUT or NO_SIGNAL plus strategy_id/version, runner_id, instrument, expiry, timestamp, feature snapshot hash, internal quality, empirical probability when calibrated, payout break-even, estimated edge and reason codes.
 
-## No-trade is a first-class outcome
-Strategies must explicitly reject unsuitable regime, stale data, insufficient history, anomalous gaps/spikes, unsupported expiry and uncalibrated conditions.
+## No-trade
+Strategies reject unsuitable regime, stale data, insufficient history, anomalous gaps/spikes, unsupported expiry and uncalibrated conditions.
 
 ## Internal multi-factor rule
-A strategy may combine its own indicators/features. Example: Trend Pulse can require momentum, trend slope and volatility. That remains one strategy. Cross-strategy voting is forbidden in V1.
+A Runner may combine factors inside its own strategy. Cross-strategy voting remains forbidden.
 
 ## Expiry profiles
-The same strategy has independent 1m, 3m and 5m parameter/calibration profiles. No assumption that parameters transfer between horizons.
+1m, 3m and 5m are separate strategy profiles with separate validation and versions.
 
 ## Parameter governance
-V1 ships versioned validated presets. Research parameters are not freely user-editable by default. User-facing control is kept to strategy selection, enabled expiries and execution/risk settings.
+V1 ships versioned validated presets. Users select/start Runners and control execution/risk settings; raw research parameters are not broadly exposed.
 
 ## Determinism
-Given the same versioned strategy, inputs and configuration, replay must return the same decision.
+Same strategy version + Runner profile + inputs + config must replay to the same decision.

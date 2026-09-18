@@ -1,28 +1,45 @@
-# V1 Strategy Selection Model
+# V1 Strategy Runner Selection Model
 
 ## Product rule
-The V1 contains five strategies, but they are not fused into one mandatory confluence engine. The user explicitly selects one strategy profile to execute.
+The V1 contains five strategy families. The user may start multiple independent Strategy Runners at the same time.
 
-Exactly one strategy is active per user/profile at a time.
+A Strategy Runner is uniquely defined by:
+- strategy_id;
+- expiry_profile: 60s, 180s or 300s.
 
-Global gates still apply after the selected strategy emits a signal: market open, broker eligibility, payout threshold, duration availability, user risk settings, simultaneous-order cap, cooldowns, daily stop, and platform rate/contract limits.
+Examples:
+- Trend Pulse + 60s
+- Trend Pulse + 180s
+- Breakout Surge + 180s
+- Anchor Pullback + 300s
+
+Each Runner evaluates opportunities independently. No Runner must agree with another.
 
 ## UX contract
-Each strategy appears as a selectable card/profile with:
-- canonical strategy name;
-- short description in plain language;
-- what market behavior it follows;
-- what generally causes an entry;
-- supported expiry windows: 1m, 3m and/or 5m after validation;
-- risk/limitations;
-- enable/select action.
+The Strategy screen shows five strategy cards. Inside each card the user sees supported expiry profiles, each with:
+- 1m toggle/select;
+- 3m toggle/select;
+- 5m toggle/select;
+- validation/availability status;
+- short description;
+- optional recent performance summary when enough evidence exists;
+- Start/Stop status.
 
-The selected strategy must be visually obvious. Strategy changes must be explicit user actions and auditable.
+The screen supports:
+- Start selected
+- Stop selected
+- Start all configured Runners
+- Stop all
+- individual Runner start/stop
 
 ## Execution invariant
-PAIR SCANNER -> ELIGIBILITY/PAYOUT FILTER -> SELECTED STRATEGY ONLY -> SIGNAL -> GLOBAL RISK/BROKER GATES -> ORDER OR SKIP.
+MARKET SCANNER -> ELIGIBILITY/PAYOUT -> EACH ACTIVE RUNNER INDEPENDENTLY -> SIGNAL -> GLOBAL RISK/SLOT ARBITER -> BROKER SAFETY -> ORDER OR SKIP.
 
-No other V1 strategy may veto, confirm, blend, average or alter the selected strategy's signal unless a future separately approved feature introduces optional confirmation filters.
+## No cross-strategy confluence
+Other Runners do not confirm, veto, blend or average a signal.
 
 ## Research rule
-Each of the five strategies is backtested, calibrated and reported independently. A strategy can be accepted or rejected independently of the other four. No strategy is labeled profitable until Deriv-specific out-of-sample/demo evidence supports that claim.
+Every strategy-expiry profile is validated independently. A failed 1m profile can be disabled while 3m/5m remain available.
+
+## Duplicate protection
+The same strategy + expiry combination may not be started twice in the same execution profile unless a future explicit feature introduces separately named variants.
