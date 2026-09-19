@@ -1,0 +1,7 @@
+{
+  "datasetId": "quant-fixture-v1",
+  "seed": 20260918,
+  "ticks": 600,
+  "proposals": 120,
+  "grade": "synthetic"
+}

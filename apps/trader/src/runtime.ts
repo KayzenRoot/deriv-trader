@@ -361,6 +361,9 @@ export class MarketScannerRuntime {
           if (!this.directionCompatible(record, direction)) continue;
           if (this.registry.isProven(symbol, direction, expiry)) continue;
           if (revokedForSymbol.get(expiry)?.has(direction)) continue;
+          // Peek first: a throttled probe sends nothing, so it must not
+          // count as a failed outcome (that would falsely revoke support).
+          if (!this.budget.peek("SIGNAL_PROPOSAL")) continue;
           const assumptions = this.probeAssumptions(symbol, direction, expiry);
           const quote = await this.source.requestProposal(assumptions);
           this.storeQuote(quote);

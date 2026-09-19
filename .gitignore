@@ -54,6 +54,7 @@ data/normalized/
 data/proposals/
 data/manifests/
 data/quarantine/
+data/research/
 data/runtime/
 data/tmp/
 !data/.gitkeep

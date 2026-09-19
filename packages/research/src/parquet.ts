@@ -208,3 +208,31 @@ export async function readParquetTicks(
     buildSha: asText(r["build_sha"]),
   }));
 }
+
+export async function readParquetProposals(
+  connection: DuckDBConnection,
+  path: string,
+): Promise<ProposalRow[]> {
+  const reader = await connection.runAndReadAll(
+    `SELECT * FROM read_parquet(${sqlString(path)}) ORDER BY received_at, underlying_symbol, duration_seconds`,
+  );
+  const objects = reader.getRowObjects() as Record<string, unknown>[];
+  return objects.map((r) => ({
+    underlyingSymbol: asText(r["underlying_symbol"]),
+    contractType: asText(r["contract_type"]),
+    durationSeconds: asNumber(r["duration_seconds"]),
+    amount: asNumber(r["amount"]),
+    basis: asText(r["basis"]),
+    currency: asText(r["currency"]),
+    askPrice: asNullableNumber(r["ask_price"]),
+    payout: asNullableNumber(r["payout"]),
+    effectivePayout: asNullableNumber(r["effective_payout"]),
+    breakEven: asNullableNumber(r["break_even"]),
+    proposalId: r["proposal_id"] === null || r["proposal_id"] === undefined ? null : asText(r["proposal_id"]),
+    state: asText(r["state"]),
+    requestedAt: asText(r["requested_at"]),
+    receivedAt: asText(r["received_at"]),
+    parserVersion: asText(r["parser_version"]),
+    buildSha: asText(r["build_sha"]),
+  }));
+}
