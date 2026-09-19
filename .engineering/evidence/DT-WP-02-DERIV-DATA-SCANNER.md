@@ -106,7 +106,18 @@ Fixture dataset: zero findings (clean). Adversarial unit rows: duplicates→WARN
 
 ## 12. Product/governance CI run IDs on final head
 
-Recorded in the final executor report after push; both workflows must be SUCCESS on the exact head before stopping.
+- Correction head `12adc8e` (PR #6 https://github.com/KayzenRoot/deriv-trader/pull/6):
+  product push run `35408817176` SUCCESS; product PR run `35408821626` SUCCESS;
+  governance PR run `35408821644` SUCCESS (all 2026-09-19 on
+  `work/DT-WP-02-DERIV-DATA-SCANNER`)
+- Review head `a84027a`: product PR `35402582002` SUCCESS, governance PR
+  `35402582001` SUCCESS, product push `35402500314` SUCCESS
+- Original failure context: n/a (first WP-02 review found contract gaps, not CI red)
+- If this file was updated after those runs to record their IDs, that update is
+  an evidence-only commit on the same branch; CI re-runs on the new tip and its
+  run IDs are confirmed SUCCESS via `gh run list` before stopping (see final
+  executor report). `git diff` between the validated head and the evidence-tip
+  shows evidence markdown only.
 
 ## 13. Known warnings/deviations
 
