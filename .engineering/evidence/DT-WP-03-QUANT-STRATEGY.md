@@ -80,7 +80,13 @@ CLI `matrix --seed 42` (also covered in-process by tests): all 15 profiles `RETE
 ## 14. Test counts + CI run IDs
 
 - Local: 26 files / 120 tests green, stable across repeats
-- Product/governance CI run IDs on final head: recorded in the final executor report after push; both must be SUCCESS before stopping
+- Final head `5a70588` (PR #7 https://github.com/KayzenRoot/deriv-trader/pull/7):
+  product push run `35417447361` SUCCESS; product PR run `35417449775` SUCCESS;
+  governance PR run `35417449779` SUCCESS (all 2026-09-19 on
+  `work/DT-WP-03-QUANT-STRATEGY`)
+- If this file was updated after those runs to record their IDs, that update is
+  an evidence-only commit; CI re-runs on the new tip and its run IDs are
+  confirmed SUCCESS before stopping (see final executor report)
 - CI failure analyzed and fixed during execution: push run `35416922434` failed the R7 lifecycle test on the slower runner (one shared overlap flag let a slow capture starve universe/pulse ticks). Fixed with per-task overlap guards plus skip accounting and per-task concurrency proof; the test uses short real intervals with poll-to-condition instead of fake timers fighting real async I/O. Re-verified locally (3× green) before push.
 
 ## 15. Exact profile verdicts
