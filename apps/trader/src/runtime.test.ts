@@ -298,6 +298,7 @@ describe("assembled MarketScannerRuntime", () => {
     clock.advance(2000);
     const result = await runtime.captureCycle();
     expect(result.finalized).toBeGreaterThan(0);
+    runtime.startReadOnlyScanner({ universeMs: 60_000, pulseMs: 60_000, captureMs: 60_000 });
     const data = runtime.statusData();
     expect(data.partitionsFinalized).toBeGreaterThan(0);
     expect(data.session.tickRows).toBeGreaterThan(0);
@@ -436,6 +437,9 @@ describe("assembled MarketScannerRuntime", () => {
     await runtime.connect();
     await runtime.ensureTicks(["frxEURUSD"]);
     fixture.emitTick("frxEURUSD", 1_700_000_100, 1.0851);
+    // Connection/subscription alone is not the continuous capture lifecycle.
+    expect(runtime.statusData().capture).toBe("idle");
+    runtime.startReadOnlyScanner({ universeMs: 60_000, pulseMs: 60_000, captureMs: 60_000 });
     expect(runtime.statusData().capture).toBe("live");
     await runtime.stop();
     expect(runtime.loopState().lifecycle).toBe("stopped");
@@ -471,6 +475,10 @@ describe("continuous read-only lifecycle (R7)", () => {
       }
       const counters = runtime.loopState().counters;
       expect(counters.universe).toBeGreaterThanOrEqual(2);
+      // The continuous lifecycle itself must prove capabilities; no manual
+      // probeExpiries() call is required after start.
+      expect(runtime.registry.isProven("frxEURUSD", "CALL", 60)).toBe(true);
+      expect(runtime.registry.isProven("frxEURUSD", "PUT", 60)).toBe(true);
       expect(counters.pulse).toBeGreaterThanOrEqual(2);
       expect(counters.capture).toBeGreaterThanOrEqual(2);
       expect(runtime.loopState().maxConcurrentCycles).toBeLessThanOrEqual(1);

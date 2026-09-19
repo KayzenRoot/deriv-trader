@@ -212,7 +212,9 @@ export class MarketScannerRuntime {
 
   /** CONNECT: supervisor drives socket + first restore; then initial universe. */
   async connect(): Promise<void> {
-    this.lifecycle = "running";
+    // Connection readiness is distinct from the continuous scanner lifecycle.
+    // Merely connecting must not make capture/status report "live".
+    if (this.lifecycle === "stopped") this.lifecycle = "idle";
     if (this.supervisor) {
       await this.supervisor.start();
     }
@@ -262,6 +264,9 @@ export class MarketScannerRuntime {
     every("universe", universeMs, async () => {
       this.loopCounters.universe += 1;
       await this.refreshUniverse();
+      // Newly discovered capabilities must be proven/rejected here so the
+      // continuous lifecycle is complete without manual probeExpiries() calls.
+      await this.probeExpiries();
       await this.ensureTicks();
     });
     every("pulse", pulseMs, async () => {
@@ -511,6 +516,7 @@ export class MarketScannerRuntime {
               {
                 registryTtlMs: this.config.scannerRegistryTtlMs,
                 capabilityTtlMs: this.config.scannerCapabilityTtlMs,
+                proposalTtlMs: this.config.scannerProposalTtlMs,
                 skewToleranceSeconds: this.config.scannerSkewToleranceS,
               },
             ),
@@ -536,7 +542,6 @@ export class MarketScannerRuntime {
       const result = eligibilityFromSnapshot(
         snapshot,
         cached?.quote ?? null,
-        cached ? this.clock.nowMs() - cached.receivedAtMs : null,
         {
           marketActive: record?.state === "ACTIVE_ELIGIBLE",
           contractAvailable,
@@ -549,7 +554,6 @@ export class MarketScannerRuntime {
           userBlocked: record?.state === "INACTIVE",
           apiHealthy: this.supervisor === null ? true : this.supervisor.getState() === "HEALTHY",
           threshold: this.config.scannerPayoutThreshold,
-          proposalTtlMs: this.config.scannerProposalTtlMs,
         },
       );
       opportunities.push({
@@ -869,7 +873,8 @@ export class MarketScannerRuntime {
       captureActive:
         this.lifecycle === "running" &&
         !this.diskStopped &&
-        (this.supervisor ? this.supervisor.getState() === "HEALTHY" : this.hub.externalCount() > 0),
+        (this.supervisor ? this.supervisor.getState() === "HEALTHY" : true) &&
+        this.hub.externalCount() > 0,
       lifecycle: this.lifecycle,
     };
   }

@@ -226,3 +226,17 @@ Root causes: isolated components with no orchestrator (connect stopped at symbol
 - Deriv docs re-verified at correction start (limits page unchanged: 360/14400 proposal, 220/14400 other, REST 300/min + 1000/10min + auth 80/min)
 - Final tests: 21 files / 79 tests green; full local gate green; clean-worktree lint-first proof below
 - Final head SHA, changed files vs `a84027a`, and CI run IDs: recorded in the final executor report after push
+
+
+### Reviewer final tightening after CORRECTION 002
+
+During exact-head re-review, three small lifecycle/authority residues were found and corrected directly on PR #6:
+- proposal freshness is now part of the assembled FreshnessSnapshot authority via proposalTtlMs/proposalStale; eligibility no longer receives a separately reconstructed proposal age/TTL path;
+- connect() no longer marks the continuous scanner lifecycle as running, and capture status requires both running lifecycle and at least one live external tick subscription;
+- the continuous universe loop now executes probeExpiries() before tick upkeep, so newly discovered symbol/direction/expiry capability can progress to the Opportunity Lattice without a manual call.
+
+Additional hardening:
+- registry/capability ERROR/STALE state now participates in freshness authority, not only age TTL;
+- tests updated to prove connect-only remains idle, startReadOnlyScanner becomes live only with a live subscription, proposal freshness is snapshot-authoritative, and continuous lifecycle proves CALL/PUT capability without manual probing.
+
+These reviewer edits preserve public/read-only scope and add no account or economic action.

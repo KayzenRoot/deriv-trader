@@ -18,12 +18,14 @@ export type SkewState = "ok" | "suspect" | "unknown";
 export interface FreshnessPolicy {
   readonly registryTtlMs: number;
   readonly capabilityTtlMs: number;
+  readonly proposalTtlMs: number;
   readonly skewToleranceSeconds: number;
 }
 
 export const DEFAULT_FRESHNESS_POLICY: FreshnessPolicy = {
   registryTtlMs: 30 * 60_000,
   capabilityTtlMs: 15 * 60_000,
+  proposalTtlMs: 30_000,
   skewToleranceSeconds: 60,
 };
 
@@ -48,6 +50,7 @@ export interface FreshnessSnapshot {
   /** Authority flags consumed directly by eligibility (fail closed). */
   readonly registryStale: boolean;
   readonly capabilityStale: boolean;
+  readonly proposalStale: boolean;
   readonly skewSuspect: boolean;
   /** Assembled authority: the single freshness verdict for this candidate. */
   readonly overall: FreshnessState;
@@ -87,9 +90,19 @@ export function summarizeFreshness(
   const skewSuspect =
     input.skewSeconds !== null && input.skewSeconds > policy.skewToleranceSeconds;
   const skewState: SkewState = input.skewSeconds === null ? "unknown" : skewSuspect ? "suspect" : "ok";
-  const registryStale = input.registryAgeMs === null || input.registryAgeMs > policy.registryTtlMs;
+  const registryStale =
+    input.registryAgeMs === null ||
+    input.registryAgeMs > policy.registryTtlMs ||
+    input.registryState === "STALE" ||
+    input.registryState === "ERROR";
   const capabilityStale =
-    input.capabilityAgeMs === null || input.capabilityAgeMs > policy.capabilityTtlMs;
+    input.capabilityAgeMs === null ||
+    input.capabilityAgeMs > policy.capabilityTtlMs ||
+    input.capabilityState !== "OK";
+  const proposalStale =
+    !input.proposalKnown ||
+    input.proposalAgeMs === null ||
+    input.proposalAgeMs > policy.proposalTtlMs;
   let overall: FreshnessState;
   if (!input.trusted) {
     overall = "UNTRUSTED";
@@ -97,7 +110,7 @@ export function summarizeFreshness(
     overall = "STALE";
   } else if (input.gapped) {
     overall = "GAPPED";
-  } else if (skewSuspect || registryStale || capabilityStale) {
+  } else if (skewSuspect || registryStale || capabilityStale || proposalStale) {
     overall = "STALE";
   } else if (input.tickState === "STALE" || input.tickState === "UNTRUSTED") {
     overall = "STALE";
@@ -128,6 +141,7 @@ export function summarizeFreshness(
     trusted: input.trusted,
     registryStale,
     capabilityStale,
+    proposalStale,
     skewSuspect,
     overall,
   };

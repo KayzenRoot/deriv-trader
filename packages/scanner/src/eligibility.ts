@@ -28,6 +28,8 @@ export interface EligibilityInput {
   readonly tickFreshness: FreshnessState;
   readonly quote: ProposalQuote | null;
   readonly quoteAgeMs: number | null;
+  /** Optional assembled freshness authority. When supplied, it overrides local TTL reconstruction. */
+  readonly proposalFresh?: boolean;
   readonly userBlocked: boolean;
   readonly apiHealthy: boolean;
   readonly threshold?: number;
@@ -75,12 +77,14 @@ export function evaluateEligibility(input: EligibilityInput): EligibilityResult 
       reason: `tick ${input.tickFreshness.toLowerCase()} for ${input.underlyingSymbol}`,
     };
   }
+  const proposalFresh =
+    input.proposalFresh ??
+    (input.quoteAgeMs !== null && input.quoteAgeMs <= ttl);
   if (
     !input.quote ||
     input.quote.state !== "KNOWN" ||
     input.quote.effectivePayout === null ||
-    input.quoteAgeMs === null ||
-    input.quoteAgeMs > ttl
+    !proposalFresh
   ) {
     return { state: "PROPOSAL_STALE", reason: `proposal unknown or stale for ${input.underlyingSymbol}` };
   }
@@ -106,7 +110,6 @@ export interface OpportunityInput extends EligibilityInput {
 export function eligibilityFromSnapshot(
   snapshot: FreshnessSnapshot,
   quote: ProposalQuote | null,
-  quoteAgeMs: number | null,
   gates: {
     readonly marketActive: boolean;
     readonly contractAvailable: boolean;
@@ -114,7 +117,6 @@ export function eligibilityFromSnapshot(
     readonly userBlocked: boolean;
     readonly apiHealthy: boolean;
     readonly threshold?: number;
-    readonly proposalTtlMs?: number;
   },
 ): EligibilityResult {
   if (snapshot.skewSuspect) {
@@ -135,6 +137,12 @@ export function eligibilityFromSnapshot(
       reason: `stale capability authority for ${snapshot.underlyingSymbol}`,
     };
   }
+  if (snapshot.proposalStale) {
+    return {
+      state: "PROPOSAL_STALE",
+      reason: `proposal unknown or stale for ${snapshot.underlyingSymbol}`,
+    };
+  }
   return evaluateEligibility({
     underlyingSymbol: snapshot.underlyingSymbol,
     expirySeconds: snapshot.expirySeconds,
@@ -143,11 +151,11 @@ export function eligibilityFromSnapshot(
     expirySupported: gates.expirySupported,
     tickFreshness: snapshot.overall,
     quote,
-    quoteAgeMs,
+    quoteAgeMs: snapshot.proposalAgeMs,
+    proposalFresh: !snapshot.proposalStale,
     userBlocked: gates.userBlocked,
     apiHealthy: gates.apiHealthy,
     ...(gates.threshold === undefined ? {} : { threshold: gates.threshold }),
-    ...(gates.proposalTtlMs === undefined ? {} : { proposalTtlMs: gates.proposalTtlMs }),
   });
 }
 
