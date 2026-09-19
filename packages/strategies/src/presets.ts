@@ -85,11 +85,32 @@ export interface SearchDimension {
   readonly min: number;
   readonly max: number;
   readonly step: number;
+  /** Profile identity makes otherwise equal numeric ranges non-interchangeable. */
+  readonly profileId?: string;
+  readonly policyHash?: string;
+}
+
+export interface SearchPolicyIdentity {
+  readonly profileId: string;
+  readonly policyVersion: string;
+  readonly policyHash: string;
+}
+
+function profileIdentity(profile: RunnerProfileId): SearchPolicyIdentity {
+  const profileId = `${profile.strategy}_${String(profile.expirySeconds)}s`;
+  const policyVersion = "search-policy-1";
+  const policyHash = createHash("sha256")
+    .update(`${policyVersion}|${profileId}`, "utf8")
+    .digest("hex");
+  return { profileId, policyVersion, policyHash };
 }
 
 /** Bounded neighborhoods per family; deterministic grid order, budget-capped. */
-export function searchSpace(strategy: StrategyFamilyId): SearchDimension[] {
-  switch (strategy) {
+export function searchSpace(input: StrategyFamilyId | RunnerProfileId): SearchDimension[] {
+  const strategy = typeof input === "string" ? input : input.strategy;
+  const identity = typeof input === "string" ? null : profileIdentity(input);
+  const dimensions: SearchDimension[] = (() => {
+    switch (strategy) {
     case "trend_pulse":
       return [
         { param: "minSlope", min: 0.0001, max: 0.0005, step: 0.0001 },
@@ -115,7 +136,17 @@ export function searchSpace(strategy: StrategyFamilyId): SearchDimension[] {
         { param: "minImbalance", min: 0.25, max: 0.55, step: 0.1 },
         { param: "minEfficiency", min: 0.3, max: 0.6, step: 0.1 },
       ];
-  }
+    }
+  })();
+  return dimensions.map((dimension) => ({
+    ...dimension,
+    ...(identity ? { profileId: identity.profileId, policyHash: identity.policyHash } : {}),
+  }));
+}
+
+/** Versioned policy identity recorded independently for every expiry profile. */
+export function searchSpaceIdentity(profile: RunnerProfileId): SearchPolicyIdentity {
+  return profileIdentity(profile);
 }
 
 /** Stable hash for any preset record (expiry-specific via caller versioning). */

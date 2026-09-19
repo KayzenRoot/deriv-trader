@@ -44,7 +44,106 @@ export function chronologicalSplit(
   return split;
 }
 
+export interface WalkForwardWindow {
+  readonly fold: number;
+  readonly train: TimeRange;
+  readonly validation: TimeRange;
+  readonly test: TimeRange;
+}
+
+/**
+ * Build rolling train/validation/test windows inside a pre-test range. The
+ * caller owns the final sealed range; this helper never crosses its `end`.
+ */
+export function rollingWalkForward(
+  start: number,
+  end: number,
+  trainFraction = 0.375,
+  validationFraction = 0.25,
+  testFraction = 0.25,
+  stepFraction = 0.125,
+): readonly WalkForwardWindow[] {
+  if (!(end > start)) throw new Error("walk-forward needs a positive range");
+  if ([trainFraction, validationFraction, testFraction, stepFraction].some((value) => value <= 0)) {
+    throw new Error("walk-forward fractions must be positive");
+  }
+  const span = end - start;
+  const trainSpan = Math.max(1, Math.floor(span * trainFraction));
+  const validationSpan = Math.max(1, Math.floor(span * validationFraction));
+  const testSpan = Math.max(1, Math.floor(span * testFraction));
+  const step = Math.max(1, Math.floor(span * stepFraction));
+  const windows: WalkForwardWindow[] = [];
+  for (let cursor = start; cursor + trainSpan + validationSpan + testSpan <= end; cursor += step) {
+    const train = { start: cursor, end: cursor + trainSpan };
+    const validation = { start: train.end, end: train.end + validationSpan };
+    const test = { start: validation.end, end: validation.end + testSpan };
+    if (!overlaps(train, validation) && !overlaps(train, test) && !overlaps(validation, test)) {
+      windows.push({ fold: windows.length + 1, train, validation, test });
+    }
+  }
+  return windows;
+}
+
 export type FoldName = "dev" | "validation" | "test";
+
+export type ResearchAccess = "search" | "measure" | "sensitivity" | "calibration";
+
+/**
+ * A fold-scoped capability is the only authority accepted by research
+ * operations.  The fold is data, not a caller-provided advisory label: the
+ * capability is created by the split owner and carries the research cycle.
+ */
+export interface ResearchCapability {
+  readonly cycleVersion: string;
+  readonly fold: FoldName;
+  readonly access: ResearchAccess;
+}
+
+export function capabilityFor(
+  cycleVersion: string,
+  fold: FoldName,
+  access: ResearchAccess,
+): ResearchCapability {
+  if (!cycleVersion) throw new Error("research capability needs a cycle version");
+  if (fold === "test" && access !== "measure") {
+    throw new Error(`final-test ${access} capability is forbidden`);
+  }
+  return Object.freeze({ cycleVersion, fold, access });
+}
+
+export function assertCapability(
+  capability: ResearchCapability,
+  expected: { readonly fold: FoldName; readonly access: ResearchAccess },
+): void {
+  if (capability.fold !== expected.fold || capability.access !== expected.access) {
+    throw new Error(
+      `research capability mismatch: expected ${expected.fold}/${expected.access}, got ${capability.fold}/${capability.access}`,
+    );
+  }
+}
+
+function requirePreTest(capability: ResearchCapability, access: "search" | "calibration"): void {
+  if (capability.fold === "test" || capability.access !== access) {
+    throw new Error(`final-test ${access} capability is forbidden`);
+  }
+}
+
+export function searchWithCapability<T>(capability: ResearchCapability, fn: () => T): T {
+  requirePreTest(capability, "search");
+  return fn();
+}
+
+export function calibrateWithCapability<T>(capability: ResearchCapability, fn: () => T): T {
+  requirePreTest(capability, "calibration");
+  return fn();
+}
+
+export function measureWithCapability<T>(capability: ResearchCapability, fn: () => T): T {
+  if (capability.access !== "measure") {
+    throw new Error(`measurement requires a measure capability, got ${capability.access}`);
+  }
+  return fn();
+}
 
 export function foldOf(split: ChronologicalSplit, timestamp: number): FoldName | null {
   if (timestamp >= split.dev.start && timestamp < split.dev.end) return "dev";
@@ -84,6 +183,18 @@ export class FinalTestLock {
       throw new Error(`final-test tuning rejected (${label}): open a new research cycle instead`);
     }
     return fn();
+  }
+
+  /** Code-level capability for read-only final-test measurement. */
+  measurementCapability(cycleVersion: string): ResearchCapability {
+    if (!this.sealed) throw new Error("final-test measurement requires a sealed lock");
+    return capabilityFor(cycleVersion, "test", "measure");
+  }
+
+  /** Explicitly rejected final-test search/calibration surface. */
+  searchCapability(cycleVersion: string, access: Exclude<ResearchAccess, "measure">): ResearchCapability {
+    if (this.sealed) throw new Error(`final-test ${access} capability is forbidden`);
+    return capabilityFor(cycleVersion, "test", access);
   }
 
   contains(timestamp: number): boolean {

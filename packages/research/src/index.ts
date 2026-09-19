@@ -12,6 +12,7 @@ export {
   finalizeParquet,
   readParquetCount,
   readParquetTicks,
+  readParquetProposals,
   compactParquetFiles,
   tickPartition,
   proposalPartition,
@@ -39,9 +40,14 @@ export {
   chronologicalSplit,
   foldOf,
   FinalTestLock,
+  capabilityFor,
+  assertCapability,
+  searchWithCapability,
+  calibrateWithCapability,
+  measureWithCapability,
 } from "./splits.js";
-export type { TimeRange, ChronologicalSplit, FoldName } from "./splits.js";
-export { joinProposal, settle, runReplay } from "./replay.js";
+export type { TimeRange, ChronologicalSplit, FoldName, ResearchAccess, ResearchCapability } from "./splits.js";
+export { joinProposal, settle, runReplay, canonicalReplayProjection, digestReplayDecisions } from "./replay.js";
 export type {
   ReplayMode,
   OutcomeLabel,
@@ -67,6 +73,8 @@ export {
   verdictFor,
   runLab,
   emptyLedger,
+  admitResearchDataset,
+  runStressSuite,
 } from "./lab.js";
 export type {
   EvidenceGrade,
@@ -77,6 +85,9 @@ export type {
   ProfileVerdict,
   ResearchLedger,
   VariantAttempt,
+  ResearchDatasetAdmissionInput,
+  VerifiedResearchDataset,
+  ResearchStressSummary,
 } from "./lab.js";
 export { orderSignals, simulate, toSimulatorSignals, SIMULATOR_POLICY_VERSION } from "./simulator.js";
 export type { SimulatorPolicy, SimulatorSignal, SimulatorFill, SimulatorMetrics } from "./simulator.js";

@@ -23,6 +23,14 @@ export interface FeatureSnapshot {
   readonly windowBars: number;
   /** Ticks excluded for duplicate/out-of-order/untrusted flags. */
   readonly excludedTicks: number;
+  /** Explicit authority for the active feature window. */
+  readonly continuity: {
+    readonly gapCount: number;
+    readonly outOfOrderCount: number;
+    readonly duplicateCount: number;
+    readonly resetAfterGap: boolean;
+  };
+  readonly qualityReason: string;
   readonly hash: string;
 }
 
@@ -91,6 +99,8 @@ export interface FeatureOptions {
   readonly agingMs?: number;
   /** Minimum bars for a complete feature set; fewer still computes. */
   readonly minBars?: number;
+  /** Event-time discontinuity threshold for the active window. */
+  readonly maxGapSeconds?: number;
 }
 
 export const FEATURE_MIN_BARS = 51;
@@ -113,6 +123,7 @@ export function computeFeatures(
   const jumpThreshold = options.anomalyJump ?? 0.02;
   const freshMs = (options.freshMs ?? 5000) / 1000;
   const agingMs = (options.agingMs ?? 15000) / 1000;
+  const maxGapSeconds = options.maxGapSeconds ?? 30;
   const usable = ticks.filter((t) => t.underlyingSymbol === symbol && t.eventTime <= atTime);
   if (usable.length === 0) return null;
   // Stale ticks never enter windows (counted in excludedTicks instead). A
@@ -127,6 +138,21 @@ export function computeFeatures(
   const lastTick = past[past.length - 1];
   if (!lastTick) return null;
   const ageSeconds = atTime - lastTick.eventTime;
+  const activeWindowSize = Math.max(...windows, 50);
+  const activeEvidence = [...usable]
+    .sort((a, b) => a.eventTime - b.eventTime || a.sequence - b.sequence)
+    .slice(-activeWindowSize);
+  let gapCount = activeEvidence.filter((t) => t.gap).length;
+  let outOfOrderCount = activeEvidence.filter((t) => t.outOfOrder).length;
+  const duplicateCount = activeEvidence.filter((t) => t.duplicate).length;
+  for (let i = 1; i < activeEvidence.length; i += 1) {
+    const previous = activeEvidence[i - 1];
+    const current = activeEvidence[i];
+    if (!previous || !current) continue;
+    if (current.eventTime - previous.eventTime > maxGapSeconds) gapCount += 1;
+    if (current.eventTime < previous.eventTime) outOfOrderCount += 1;
+  }
+  const continuityBroken = gapCount > 0 || outOfOrderCount > 0 || duplicateCount > 0;
   const closes = past.map((t) => t.quote);
   const values: Record<string, number> = {};
   const last = closes[closes.length - 1] ?? 0;
@@ -233,7 +259,7 @@ export function computeFeatures(
   }
   const freshness: FeatureSnapshot["freshness"] = untrusted
     ? "UNTRUSTED"
-    : lastTick.gap
+    : continuityBroken || lastTick.gap
       ? "GAPPED"
       : ageSeconds > agingMs
         ? "STALE"
@@ -250,13 +276,28 @@ export function computeFeatures(
     anomaly,
     windowBars: past.length,
     excludedTicks: excluded,
+    continuity: {
+      gapCount,
+      outOfOrderCount,
+      duplicateCount,
+      resetAfterGap: continuityBroken,
+    },
+    qualityReason: untrusted
+      ? "stale/untrusted tick in active window"
+      : continuityBroken
+        ? "active feature window contains continuity anomaly"
+        : freshness === "STALE"
+          ? "latest usable tick is stale"
+          : freshness === "AGING"
+            ? "latest usable tick is aging"
+            : "continuous active feature window",
   };
   return { ...snapshot, hash: hashSnapshot(snapshot) };
 }
 
 export function hashSnapshot(snapshot: Omit<FeatureSnapshot, "hash">): string {
   const keys = Object.keys(snapshot.values).sort();
-  const canonical = `${snapshot.featureVersion}|${snapshot.symbol}|${String(snapshot.eventTime)}|${snapshot.provenance}|${keys.map((k) => `${k}=${String(snapshot.values[k] ?? 0)}`).join(",")}|${snapshot.freshness}|${String(snapshot.anomaly)}|${String(snapshot.windowBars)}|${String(snapshot.excludedTicks)}`;
+  const canonical = `${snapshot.featureVersion}|${snapshot.symbol}|${String(snapshot.eventTime)}|${snapshot.provenance}|${keys.map((k) => `${k}=${String(snapshot.values[k] ?? 0)}`).join(",")}|${snapshot.freshness}|${String(snapshot.anomaly)}|${String(snapshot.windowBars)}|${String(snapshot.excludedTicks)}|${String(snapshot.continuity.gapCount)}|${String(snapshot.continuity.outOfOrderCount)}|${String(snapshot.continuity.duplicateCount)}|${String(snapshot.continuity.resetAfterGap)}|${snapshot.qualityReason}`;
   return createHash("sha256").update(canonical, "utf8").digest("hex");
 }
 
@@ -299,6 +340,7 @@ export class SharedFeatureGraph {
       String(options.anomalyJump ?? 0.02),
       String(options.freshMs ?? 5000),
       String(options.agingMs ?? 15000),
+      String(options.maxGapSeconds ?? 30),
     ].join("|");
   }
 

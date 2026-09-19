@@ -189,7 +189,21 @@ describe("portfolio simulator rules", () => {
     }
     const metrics = simulate(orderSignals(signals), { ...policy, cooldownSeconds: 0 });
     expect(metrics.blockedDaily).toBeGreaterThan(0);
-    expect(metrics.worstLossCluster).toBeGreaterThanOrEqual(5);
+    // Loss clusters are contracts overlapping in time, not merely consecutive
+    // settled losses. These contracts are spaced beyond their 60s expiry.
+    expect(metrics.worstLossCluster).toBe(1);
+    expect(metrics.worstOverlappingLossCluster).toBe(1);
+  });
+
+  it("does not apply a future loss to daily state before settlement", () => {
+    const metrics = simulate([
+      { time: 100, runnerId: "a", instrument: "X", expirySeconds: 1000 as const, signal: "SIGNAL_PUT" as const, realized: -1 },
+      { time: 200, runnerId: "b", instrument: "Y", expirySeconds: 60 as const, signal: "SIGNAL_CALL" as const, realized: null },
+      { time: 1200, runnerId: "c", instrument: "Z", expirySeconds: 60 as const, signal: "SIGNAL_CALL" as const, realized: 0.9 },
+    ], { ...policy, maxSimultaneous: 10, maxPerInstrument: 1, dailyStopLoss: 1, cooldownSeconds: 0 });
+    expect(metrics.fills).toBe(2);
+    expect(metrics.blockedDaily).toBe(1);
+    expect(metrics.unknownSettlements).toBe(1);
   });
 });
 

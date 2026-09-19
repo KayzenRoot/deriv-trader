@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { generateProposals, generateTicks } from "./dataset.js";
 import { runLab, type LabDataset } from "./lab.js";
+import { admitResearchDataset } from "./lab.js";
+import { createPassport, fileSha256 } from "./passport.js";
 import { ALL_PROFILES } from "@deriv-trader/strategies";
 
 function labDataset(): LabDataset {
@@ -72,4 +74,54 @@ describe("quant lab pipeline", () => {
     const expiries = run.verdicts.map((v) => v.profile.expirySeconds).sort((a, b) => a - b);
     expect(expiries).toEqual([60, 180, 300]);
   }, 300000);
+
+  it("does not trust a caller-supplied real grade without verified admission", () => {
+    const profile = ALL_PROFILES[0];
+    if (!profile) throw new Error("missing test profile");
+    const run = runLab({ ...labDataset(), grade: "real" }, {
+      seed: 99,
+      codeVersion: "test-1",
+      configHash: "cfg-test",
+      minOosSignals: 0,
+    }, [profile]);
+    expect(run.verdicts[0]?.state).toBe("RETEST_REQUIRED");
+    expect(run.verdicts[0]?.reason).toContain("verified Passport");
+  }, 300000);
+
+  it("admits only Passport-bound partitions with a clean DQG", () => {
+    const source = labDataset();
+    const tickBytes = new TextEncoder().encode("ticks");
+    const proposalBytes = new TextEncoder().encode("proposals");
+    const passport = createPassport({
+      datasetId: "admission-test",
+      createdAt: "2026-09-19T00:00:00.000Z",
+      collectorSha: "test-sha",
+      parserVersion: "test-parser",
+      sourceEndpoints: [],
+      environment: "test",
+      symbols: ["SYNTH_A", "SYNTH_B"],
+      timeRange: { start: "2023-11-14T22:13:20.000Z", end: "2023-11-14T22:33:20.000Z" },
+      files: [
+        { path: "ticks.parquet", sha256: fileSha256(tickBytes), rows: source.ticks.length },
+        { path: "proposals.parquet", sha256: fileSha256(proposalBytes), rows: source.proposals.length },
+      ],
+    });
+    const admitted = admitResearchDataset({
+      ticks: source.ticks,
+      proposals: source.proposals,
+      passport,
+      fileHashes: { "ticks.parquet": fileSha256(tickBytes), "proposals.parquet": fileSha256(proposalBytes) },
+    });
+    expect(admitted.verifiedAdmission).toBe(true);
+    expect(admitted.datasetHash).toBe(passport.manifestHash);
+    const firstTick = source.ticks[0];
+    const firstFile = passport.files[0];
+    if (!firstTick || !firstFile) throw new Error("missing admission fixture");
+    expect(() => admitResearchDataset({
+      ticks: [{ ...firstTick, quote: 0 }],
+      proposals: [],
+      passport: createPassport({ ...passport, files: [{ ...firstFile, rows: 1 }] }),
+      fileHashes: { "ticks.parquet": fileSha256(tickBytes), "proposals.parquet": fileSha256(proposalBytes) },
+    })).toThrow();
+  });
 });

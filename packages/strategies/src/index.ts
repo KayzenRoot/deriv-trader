@@ -67,6 +67,7 @@ export {
   gridVariants,
   presetHash,
   searchSpace,
+  searchSpaceIdentity,
   seedPreset,
 } from "./presets.js";
-export type { RunnerProfileId, SearchDimension, StrategyFamilyId } from "./presets.js";
+export type { RunnerProfileId, SearchDimension, SearchPolicyIdentity, StrategyFamilyId } from "./presets.js";

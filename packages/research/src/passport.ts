@@ -103,6 +103,17 @@ export function createPassport(input: PassportInput): DatasetPassport {
 }
 
 export function verifyPassport(passport: DatasetPassport): boolean {
+  if (!passport.datasetId || !passport.datasetVersion || !passport.parserVersion || !passport.schemaVersion) return false;
+  const files: readonly PassportFile[] = passport.files;
+  if (files.length === 0) return false;
+  const paths = new Set<string>();
+  let rows = 0;
+  for (const file of files) {
+    if (!file.path || paths.has(file.path) || !file.sha256 || !Number.isInteger(file.rows) || file.rows < 0) return false;
+    paths.add(file.path);
+    rows += file.rows;
+  }
+  if (rows !== passport.totalRows || !Number.isInteger(passport.totalRows) || passport.totalRows < 0) return false;
   const body: Record<string, unknown> = { ...passport };
   delete body["manifestHash"];
   delete body["createdAt"];

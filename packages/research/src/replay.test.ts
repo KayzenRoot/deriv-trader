@@ -4,12 +4,13 @@ import { generateProposals, generateTicks } from "./dataset.js";
 import {
   DEFAULT_PROPOSAL_TTL_MS,
   joinProposal,
+  digestReplayDecisions,
   REPLAY_ECONOMICS_VERSION,
   runReplay,
   settle,
   type ReplayRunner,
 } from "./replay.js";
-import { chronologicalSplit, FinalTestLock, foldOf, overlaps } from "./splits.js";
+import { chronologicalSplit, FinalTestLock, foldOf, overlaps, rollingWalkForward } from "./splits.js";
 
 function dataset(seed = 42): { ticks: MarketTick[]; proposals: ProposalQuote[] } {
   const ticks = generateTicks({
@@ -125,6 +126,32 @@ describe("deterministic replay", () => {
     expect(output.decisions.every((d) => d.realized === null)).toBe(true);
     expect(output.decisions.some((d) => d.points !== null)).toBe(true);
   });
+
+  it("delivers the actual symbol to a shared replay runner", () => {
+    const a = generateTicks({ symbol: "A", startEpoch: 1_700_000_000, ticks: 80, basePrice: 100, seed: 1, regimes: ["trend_up"] });
+    const b = generateTicks({ symbol: "B", startEpoch: 1_700_000_000, ticks: 80, basePrice: 200, seed: 2, regimes: ["trend_down"] });
+    const seen: string[] = [];
+    const output = runReplay({
+      ...BASE,
+      ticks: [...a, ...b],
+      proposals: [],
+      runners: [{ ...callRunner(), decide: ({ symbol }) => { seen.push(symbol); return { signal: "NO_SIGNAL", quality: 0, reason: "probe" }; } }],
+      mode: "market-only",
+      toTime: 1_700_000_079,
+    });
+    expect(output.decisions.map((d) => d.instrument)).toContain("A");
+    expect(output.decisions.map((d) => d.instrument)).toContain("B");
+    expect(new Set(seen)).toEqual(new Set(["A", "B"]));
+  });
+
+  it("canonical digest changes for material proposal and settlement fields", () => {
+    const { ticks, proposals } = dataset();
+    const first = runReplay({ ...BASE, ticks, proposals });
+    const changed = first.decisions.map((decision, index) => index === 0 ? { ...decision, proposalAgeMs: (decision.proposalAgeMs ?? 0) + 1, realized: decision.realized === null ? 0 : decision.realized } : decision);
+    expect(digestReplayDecisions(changed, { ...BASE, datasetPassportHash: "passport-a" })).not.toBe(
+      digestReplayDecisions(first.decisions, { ...BASE, datasetPassportHash: "passport-a" }),
+    );
+  });
 });
 
 describe("chronological splits and final-test lock", () => {
@@ -148,5 +175,19 @@ describe("chronological splits and final-test lock", () => {
     expect(lock.measure(() => 3)).toBe(3);
     expect(lock.contains(900)).toBe(true);
     expect(lock.contains(700)).toBe(false);
+  });
+
+  it("builds rolling walk-forward windows without crossing the sealed range", () => {
+    const windows = rollingWalkForward(0, 800);
+    expect(windows).toHaveLength(2);
+    expect(windows[0]?.train).toEqual({ start: 0, end: 300 });
+    expect(windows[0]?.validation).toEqual({ start: 300, end: 500 });
+    expect(windows[0]?.test).toEqual({ start: 500, end: 700 });
+    expect(windows[1]?.test.end).toBe(800);
+    for (const window of windows) {
+      expect(overlaps(window.train, window.validation)).toBe(false);
+      expect(overlaps(window.train, window.test)).toBe(false);
+      expect(overlaps(window.validation, window.test)).toBe(false);
+    }
   });
 });

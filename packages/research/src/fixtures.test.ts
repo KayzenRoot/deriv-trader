@@ -11,6 +11,7 @@ import {
   openMemory,
   readParquetCount,
   readParquetTicks,
+  readParquetProposals,
   verifyPassport,
 } from "./index.js";
 
@@ -30,6 +31,9 @@ describe("committed fixtures (DT-WP-02 evidence)", () => {
       const ticks = await readParquetTicks(connection, TICKS);
       expect(ticks.map((t) => t.underlyingSymbol).filter((s) => s === "frxEURUSD")).toHaveLength(12);
       expect(blocksDataset(checkTicks(ticks))).toBe(false);
+      const proposals = await readParquetProposals(connection, PROPOSALS);
+      expect(proposals).toHaveLength(6);
+      expect(blocksDataset(checkProposals(proposals))).toBe(false);
     } finally {
       connection.closeSync();
     }

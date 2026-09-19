@@ -44,11 +44,17 @@ export interface ReplayDecision {
   readonly featureHash: string;
   readonly quality: number;
   readonly proposalKey: string | null;
+  readonly proposalId?: string | null;
   readonly proposalReceivedAt: string | null;
   readonly proposalAgeMs: number | null;
+  readonly askPrice?: number | null;
+  readonly payout?: number | null;
   readonly effectivePayout: number | null;
   readonly breakEven: number | null;
   readonly reason: string;
+  readonly economicsPolicy?: string;
+  readonly configHash?: string;
+  readonly datasetPassportHash?: string;
 }
 
 export interface SettledDecision extends ReplayDecision {
@@ -64,6 +70,7 @@ export interface ReplayManifest {
   readonly mode: ReplayMode;
   readonly codeVersion: string;
   readonly datasetHash: string;
+  readonly datasetPassportHash: string;
   readonly featureVersion: string;
   readonly strategyVersions: Record<string, string>;
   readonly presetVersions: Record<string, string>;
@@ -75,6 +82,53 @@ export interface ReplayManifest {
   readonly decisionsHash: string;
   readonly fromTime: number;
   readonly toTime: number;
+}
+
+/** Canonical projection used for exact replay identity and evidence binding. */
+export function canonicalReplayProjection(
+  decisions: readonly SettledDecision[],
+  input: Pick<ReplayInput, "economics" | "configHash" | "datasetPassportHash" | "featureVersion" | "codeVersion" | "seed">,
+): readonly unknown[][] {
+  return decisions.map((d) => [
+    d.time,
+    d.runnerId,
+    d.strategyId,
+    d.instrument,
+    d.expirySeconds,
+    d.presetVersion,
+    d.featureHash,
+    d.signal,
+    d.quality,
+    d.reason,
+    d.proposalKey,
+    d.proposalId,
+    d.proposalReceivedAt,
+    d.proposalAgeMs,
+    d.askPrice,
+    d.payout,
+    d.effectivePayout,
+    d.breakEven,
+    d.targetTime,
+    d.label,
+    d.realized,
+    d.points,
+    input.economics.version,
+    input.economics.proposalTtlMs,
+    input.datasetPassportHash,
+    input.featureVersion,
+    input.codeVersion,
+    input.configHash,
+    input.seed,
+  ]);
+}
+
+export function digestReplayDecisions(
+  decisions: readonly SettledDecision[],
+  input: Pick<ReplayInput, "economics" | "configHash" | "datasetPassportHash" | "featureVersion" | "codeVersion" | "seed">,
+): string {
+  return createHash("sha256")
+    .update(JSON.stringify(canonicalReplayProjection(decisions, input)), "utf8")
+    .digest("hex");
 }
 
 /**
@@ -162,6 +216,8 @@ export interface ReplayInput {
   readonly economics: ReplayEconomicsPolicy;
   readonly codeVersion: string;
   readonly datasetHash: string;
+  /** Verified Dataset Passport hash; datasetHash is the legacy fallback. */
+  readonly datasetPassportHash?: string;
   readonly featureVersion: string;
   readonly configHash: string;
   readonly seed: number;
@@ -211,8 +267,11 @@ export function runReplay(input: ReplayInput): ReplayOutput {
           vote = runner.decide({ symbol, time: tick.eventTime, tick, features: snapshot });
         }
         let proposalKey: string | null = null;
+        let proposalId: string | null = null;
         let proposalReceivedAt: string | null = null;
         let proposalAgeMs: number | null = null;
+        let askPrice: number | null = null;
+        let payout: number | null = null;
         let effectivePayout: number | null = null;
         let breakEven: number | null = null;
         if (input.mode === "proposal-aware" && vote.signal !== "NO_SIGNAL" && snapshot) {
@@ -233,8 +292,11 @@ export function runReplay(input: ReplayInput): ReplayOutput {
           );
           if (quote) {
             proposalKey = quote.key;
+            proposalId = quote.proposalId;
             proposalReceivedAt = quote.receivedAt;
             proposalAgeMs = tick.eventTime * 1000 - Date.parse(quote.receivedAt);
+            askPrice = quote.askPrice;
+            payout = quote.payout;
             effectivePayout = quote.effectivePayout;
             breakEven = quote.breakEven;
           }
@@ -259,11 +321,17 @@ export function runReplay(input: ReplayInput): ReplayOutput {
           featureHash: snapshot?.hash ?? "none",
           quality: vote.quality,
           proposalKey,
+          proposalId,
           proposalReceivedAt,
           proposalAgeMs,
+          askPrice,
+          payout,
           effectivePayout,
           breakEven,
           reason: vote.reason,
+          economicsPolicy: input.economics.version,
+          configHash: input.configHash,
+          datasetPassportHash: input.datasetPassportHash ?? input.datasetHash,
           targetTime,
           label,
           realized:
@@ -279,27 +347,15 @@ export function runReplay(input: ReplayInput): ReplayOutput {
     }
   }
   settled.sort((a, b) => a.time - b.time || (a.runnerId < b.runnerId ? -1 : 1));
-  const decisionsHash = createHash("sha256")
-    .update(
-      JSON.stringify(
-        settled.map((d) => [
-          d.time,
-          d.runnerId,
-          d.strategyId,
-          d.instrument,
-          d.expirySeconds,
-          d.presetVersion,
-          d.featureHash,
-          d.signal,
-          d.proposalKey,
-          d.proposalReceivedAt,
-          d.effectivePayout,
-          d.label,
-          d.reason,
-        ]),
-      ),
-    )
-    .digest("hex");
+  const passportHash = input.datasetPassportHash ?? input.datasetHash;
+  const decisionsHash = digestReplayDecisions(settled, {
+    economics: input.economics,
+    configHash: input.configHash,
+    datasetPassportHash: passportHash,
+    featureVersion: input.featureVersion,
+    codeVersion: input.codeVersion,
+    seed: input.seed,
+  });
   const versions: Record<string, string> = {};
   const presetVersions: Record<string, string> = {};
   for (const runner of orderedRunners) {
@@ -312,6 +368,7 @@ export function runReplay(input: ReplayInput): ReplayOutput {
       mode: input.mode,
       codeVersion: input.codeVersion,
       datasetHash: input.datasetHash,
+      datasetPassportHash: passportHash,
       featureVersion: input.featureVersion,
       strategyVersions: versions,
       presetVersions,
@@ -332,7 +389,8 @@ function realizedPnl(
   label: OutcomeLabel,
   effectivePayout: number | null,
 ): number | null {
-  if (signal === "NO_SIGNAL" || label === "UNKNOWN" || label === "FLAT") return 0;
+  if (signal === "NO_SIGNAL" || label === "UNKNOWN") return null;
+  if (label === "FLAT") return 0;
   if (effectivePayout === null) return null;
   const won =
     (signal === "SIGNAL_CALL" && label === "UP") || (signal === "SIGNAL_PUT" && label === "DOWN");
@@ -343,7 +401,7 @@ function directionalPoints(
   signal: ReplayDecision["signal"],
   label: OutcomeLabel,
 ): number | null {
-  if (signal === "NO_SIGNAL" || label === "UNKNOWN" || label === "FLAT") return 0;
+  if (signal === "NO_SIGNAL" || label === "UNKNOWN" || label === "FLAT") return null;
   const won =
     (signal === "SIGNAL_CALL" && label === "UP") || (signal === "SIGNAL_PUT" && label === "DOWN");
   return won ? 1 : -1;

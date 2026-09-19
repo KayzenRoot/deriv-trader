@@ -43,17 +43,19 @@ export interface SimulatorMetrics {
   readonly maxDrawdown: number;
   readonly maxSimultaneousUsed: number;
   readonly worstLossCluster: number;
+  /** Maximum concurrently open losing-contract cluster (not consecutive fills). */
+  readonly worstOverlappingLossCluster: number;
   readonly contributionByRunner: Record<string, number>;
   readonly contributionByInstrument: Record<string, number>;
   readonly starvedRunners: string[];
+  readonly unknownSettlements: number;
+  readonly settlementEvents: number;
 }
 
 interface OpenPosition {
-  readonly runnerId: string;
-  readonly instrument: string;
+  readonly signal: SimulatorSignal;
+  readonly admittedAt: number;
   readonly releaseAt: number;
-  readonly realized: number;
-  readonly date: string;
 }
 
 /** Deterministic signal-ready ordering: time, runner, instrument, expiry. */
@@ -69,6 +71,7 @@ export function orderSignals(signals: SimulatorSignal[]): SimulatorSignal[] {
 export function simulate(signals: SimulatorSignal[], policy: SimulatorPolicy): SimulatorMetrics {
   const ordered = orderSignals(signals);
   const open: OpenPosition[] = [];
+  const settledPositions: OpenPosition[] = [];
   const fills: SimulatorFill[] = [];
   const lastFillAt = new Map<string, number>();
   const dailyPnl = new Map<string, number>();
@@ -81,14 +84,51 @@ export function simulate(signals: SimulatorSignal[], policy: SimulatorPolicy): S
   const contributionByInstrument: Record<string, number> = {};
   const seenRunners = new Set<string>();
   const filledRunners = new Set<string>();
+  const lossIntervals: { readonly start: number; readonly end: number }[] = [];
+  let equity = 0;
+  let peak = 0;
+  let maxDrawdown = 0;
+  let unknownSettlements = 0;
+  let settlementEvents = 0;
+
+  const settlePosition = (position: OpenPosition): void => {
+    settledPositions.push(position);
+    settlementEvents += 1;
+    const realized = position.signal.realized;
+    if (realized === null) {
+      unknownSettlements += 1;
+      return;
+    }
+    const settlementTime = position.releaseAt;
+    const pnl = realized * policy.fixedStake;
+    equity += pnl;
+    peak = Math.max(peak, equity);
+    maxDrawdown = Math.max(maxDrawdown, peak - equity);
+    const date = new Date(settlementTime * 1000).toISOString().slice(0, 10);
+    dailyPnl.set(date, (dailyPnl.get(date) ?? 0) + pnl);
+    contributionByRunner[position.signal.runnerId] =
+      (contributionByRunner[position.signal.runnerId] ?? 0) + pnl;
+    contributionByInstrument[position.signal.instrument] =
+      (contributionByInstrument[position.signal.instrument] ?? 0) + pnl;
+    if (realized < 0) lossIntervals.push({ start: position.admittedAt, end: position.releaseAt });
+  };
+
+  const settleDue = (time: number): void => {
+    const due = open
+      .filter((position) => position.releaseAt <= time)
+      .sort((a, b) => a.releaseAt - b.releaseAt || a.signal.runnerId.localeCompare(b.signal.runnerId));
+    for (const position of due) {
+      const index = open.indexOf(position);
+      if (index >= 0) open.splice(index, 1);
+      settlePosition(position);
+    }
+  };
 
   for (const signal of ordered) {
     seenRunners.add(signal.runnerId);
-    // Release expired positions before admission (no delayed stale queue).
-    for (let i = open.length - 1; i >= 0; i -= 1) {
-      const position = open[i];
-      if (position && position.releaseAt <= signal.time) open.splice(i, 1);
-    }
+    // Settlement events are processed before an admission at the same time.
+    // This prevents a future loss from affecting daily state before expiry.
+    settleDue(signal.time);
     const date = new Date(signal.time * 1000).toISOString().slice(0, 10);
     const day = dailyPnl.get(date) ?? 0;
     if (policy.dailyStopLoss !== null && day <= -policy.dailyStopLoss) {
@@ -107,7 +147,7 @@ export function simulate(signals: SimulatorSignal[], policy: SimulatorPolicy): S
       fills.push({ signal, admitted: false, blockedReason: "SLOT_EXHAUSTED" });
       continue;
     }
-    if (live.filter((p) => p.instrument === signal.instrument).length >= policy.maxPerInstrument) {
+    if (live.filter((p) => p.signal.instrument === signal.instrument).length >= policy.maxPerInstrument) {
       blockedInstrument += 1;
       fills.push({ signal, admitted: false, blockedReason: "INSTRUMENT_CAP" });
       continue;
@@ -118,41 +158,28 @@ export function simulate(signals: SimulatorSignal[], policy: SimulatorPolicy): S
       fills.push({ signal, admitted: false, blockedReason: "COOLDOWN" });
       continue;
     }
-    const realized = signal.realized ?? 0;
     open.push({
-      runnerId: signal.runnerId,
-      instrument: signal.instrument,
+      signal,
+      admittedAt: signal.time,
       releaseAt: signal.time + signal.expirySeconds,
-      realized,
-      date,
     });
     maxSimultaneousUsed = Math.max(maxSimultaneousUsed, open.filter((p) => p.releaseAt > signal.time).length);
     lastFillAt.set(`${signal.runnerId}|${signal.instrument}`, signal.time);
-    dailyPnl.set(date, day + realized * policy.fixedStake);
-    contributionByRunner[signal.runnerId] = (contributionByRunner[signal.runnerId] ?? 0) + realized * policy.fixedStake;
-    contributionByInstrument[signal.instrument] =
-      (contributionByInstrument[signal.instrument] ?? 0) + realized * policy.fixedStake;
     filledRunners.add(signal.runnerId);
     fills.push({ signal, admitted: true, blockedReason: null });
   }
 
-  let equity = 0;
-  let peak = 0;
-  let maxDrawdown = 0;
-  let lossRun = 0;
+  // Flush open settlements after the final admission before reporting metrics.
+  settleDue(Number.POSITIVE_INFINITY);
   let worstLossCluster = 0;
-  for (const fill of fills) {
-    if (!fill.admitted) continue;
-    const pnl = (fill.signal.realized ?? 0) * policy.fixedStake;
-    equity += pnl;
-    peak = Math.max(peak, equity);
-    maxDrawdown = Math.max(maxDrawdown, peak - equity);
-    if (pnl < 0) {
-      lossRun += 1;
-      worstLossCluster = Math.max(worstLossCluster, lossRun);
-    } else {
-      lossRun = 0;
-    }
+  const events = lossIntervals.flatMap((interval) => [
+    { time: interval.start, delta: 1, kind: 1 },
+    { time: interval.end, delta: -1, kind: 0 },
+  ]).sort((a, b) => a.time - b.time || a.kind - b.kind);
+  let activeLosses = 0;
+  for (const event of events) {
+    activeLosses += event.delta;
+    worstLossCluster = Math.max(worstLossCluster, activeLosses);
   }
   return {
     fills: fills.filter((f) => f.admitted).length,
@@ -164,9 +191,12 @@ export function simulate(signals: SimulatorSignal[], policy: SimulatorPolicy): S
     maxDrawdown,
     maxSimultaneousUsed,
     worstLossCluster,
+    worstOverlappingLossCluster: worstLossCluster,
     contributionByRunner,
     contributionByInstrument,
     starvedRunners: [...seenRunners].filter((r) => !filledRunners.has(r)).sort(),
+    unknownSettlements,
+    settlementEvents,
   };
 }
 

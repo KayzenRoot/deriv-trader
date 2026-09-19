@@ -13,7 +13,7 @@ import { decideMeanSnapback, presetSchema as snapbackPreset } from "./mean-snapb
 import { decideBreakoutSurge, presetSchema as breakoutPreset } from "./breakout-surge.js";
 import { decideAnchorPullback, presetSchema as pullbackPreset } from "./anchor-pullback.js";
 import { decideMicroPressure, presetSchema as microPreset } from "./micro-pressure.js";
-import { seedPreset, gridVariants, searchSpace, ALL_PROFILES } from "./presets.js";
+import { seedPreset, gridVariants, searchSpace, searchSpaceIdentity, ALL_PROFILES } from "./presets.js";
 import type { StrategyInput } from "./engine.js";
 
 function ticks(
@@ -225,6 +225,13 @@ describe("shared feature graph", () => {
     expect(blocked?.signal).toBe("NO_SIGNAL");
     expect(blocked?.noSignalCode).toBe("UNTRUSTED_INPUT");
   });
+
+  it("marks continuity anomalies anywhere inside the active window", () => {
+    const history = trendUp().map((tick, index) => index === 60 ? { ...tick, gap: true } : tick);
+    const snapshot = computeFeatures(history, "SYNTH", 1_700_000_069, "test");
+    expect(snapshot?.freshness).toBe("GAPPED");
+    expect(snapshot?.continuity.gapCount).toBeGreaterThan(0);
+  });
 });
 
 describe("trend pulse", () => {
@@ -368,6 +375,8 @@ describe("presets and search", () => {
       seen.add(seed.version);
       expect(seen.has(seed.hash)).toBe(false);
       seen.add(seed.hash);
+      expect(searchSpaceIdentity(profile).profileId).toBe(`${profile.strategy}_${String(profile.expirySeconds)}s`);
+      expect(searchSpace(profile).every((dimension) => dimension.profileId === searchSpaceIdentity(profile).profileId)).toBe(true);
     }
     expect(seen.size).toBe(30);
     const variants = gridVariants(seedPreset({ strategy: "trend_pulse", expirySeconds: 60 }).preset, [
