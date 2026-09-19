@@ -1,6 +1,6 @@
 # Evidence — DT-WP-03 QUANT & STRATEGY ENGINE MODULE
 
-Status: READY_FOR_REVIEW (executor verdict; ChatGPT review owns APPROVED)
+Status: READY_FOR_REVIEW (CORRECTION-002 execution candidate; ChatGPT exact-head review owns APPROVED)
 Risk: HIGH_ASSURANCE — research/strategies only, no economic execution
 Work Order: DT-WP-03-QUANT-STRATEGY (+ CORRECTION-001 review findings)
 Base checkpoint: DT-CP-0006
@@ -11,7 +11,8 @@ Base checkpoint: DT-CP-0006
 - Compile main SHA: `995c5988c62e3fc9888a4c7f407fd92e309e7f15`
 - Verified `origin/main` at execution: identical (PR #6 merged as `d520fa7`; checkpoint `17769f8` DT-CP-0006; `git fetch --all --prune --tags` clean, working tree clean)
 - Target branch: `work/DT-WP-03-QUANT-STRATEGY` (created from verified main)
-- Final head SHA: recorded in the final executor report after commit
+- Correction-002 implementation head: `3d2f1eaecc6a3ce00ed7f66f181f326662f5ffdb`
+- Evidence tip SHA: recorded in the final executor report after the evidence commit; no merge performed
 
 ## 2. Environment
 
@@ -122,3 +123,47 @@ NO profile was moved to ENABLED — no code path in WP-03 can assign it (verdict
 - `sharp` allow-scripts notice, Vitest fsModuleCache hint, Actions runner notices — all pre-existing, unrelated
 - No dependency deviations; no legacy endpoints; no scope expansion (no buy/sell/auth/risk/UI/money)
 - UNRESOLVED_CRITICAL_HIGH: 0
+
+## 19. CORRECTION-002 execution closure
+
+Correction-002 was executed from the PDF-defined boundary `DT-WP-03-CORRECTION-002-CODEX` against reviewed head `b7bb35862edfc03b3f2daefa4cf1f59de53d6860`. The implementation commit is `3d2f1eaecc6a3ce00ed7f66f181f326662f5ffdb`; the evidence commit and final branch tip are reported separately because the evidence file itself is committed after the implementation SHA is known.
+
+R1-R12 disposition at the implementation head:
+
+- R1: replay runner identity now takes the `StrategyInput.instrument` symbol as authoritative; adversarial multi-symbol coverage is present.
+- R2: real admission requires canonical Passport verification, exact file hashes, row-count binding, and a clean DQG. A caller-supplied `grade: real` cannot unlock OOS; synthetic/raw fixtures remain capped at `RETEST_REQUIRED`.
+- R3: calibration is dev-only; OOS uses the versioned `oos-edge-margin-1` safety margin and records PASS/FAIL/UNKNOWN diagnostics. OOS acceptance requires adequate calibration and every OOS signal to pass the Edge Gate.
+- R4: deterministic passive baselines, payout/latency/tick-thinning/gap/regime/instrument-removal stress summaries, seeded block-bootstrap sequence statistics, and rolling pre-test walk-forward windows are emitted. The final sealed test range remains outside the rolling windows.
+- R5: fold-scoped capability APIs reject search/calibration on test; the sealed final test is measured once per profile and carries cycle identity and search-policy identity.
+- R6: admission and settlement are separate simulator events; settlements precede same-time admissions, UNKNOWN never becomes zero, final flush is explicit, and drawdown/loss-cluster metrics are settlement-based.
+- R7: `dt-research` accepts `--dataset-path`, `--passport`, and `--dataset-id`, reads Parquet through DuckDB, verifies Passport file hashes and DQG before returning a real dataset. The historical WP-02 summary manifest is intentionally rejected; `fixtures/acceptance-manifest.json` is the complete Passport for the committed Parquet fixture.
+- R8: CALL/PUT/NO_SIGNAL and invalid-quality fixture paths remain covered by tests; no strategy family can be promoted from synthetic evidence.
+- R9: feature snapshots carry active-window continuity, gap, out-of-order, duplicate, and explicit quality provenance; deterministic refusal is covered.
+- R10: search spaces carry profile-aware policy identity/version and policy hash in the ledger.
+- R11: replay digest projection binds timing, runner/strategy/instrument/expiry, preset, feature/signal/quality, proposal identity/age/economics, settlement label/realized value, policy, Passport hash, versions, config, and seed.
+- R12: the evidence and final report distinguish local qualification, hosted CI, independent review, and merge state; no profitability or live-trading claim is made.
+
+### Local qualification at implementation head
+
+- `npm ci`: passed; 0 high-severity audit vulnerabilities.
+- `npm run check:eol`: passed.
+- `npm run check:deps`: passed, 48/48 self-tests.
+- `npm run check:cycles`: passed.
+- `npm run lint`: passed with zero warnings.
+- `npm run typecheck`: passed.
+- `npm run test -- --run`: passed, 26 files / 130 tests.
+- `npm run build`: passed.
+- `npm run audit:high`: passed, 0 vulnerabilities.
+- `npm --workspace @deriv-trader/web run build`: passed.
+- `npm --workspace @deriv-trader/trader run build`: passed.
+- Trader regression (`market.test.ts` + `server.test.ts`): passed, 2 files / 4 tests.
+- `git diff --check`: passed.
+- CLI foreground proof: synthetic `inspect`, `replay`, `matrix`, and `portfolio` passed; the 15-profile matrix reported 15 `RETEST_REQUIRED`, 0 `ENABLED`. Parquet + complete Passport `inspect` and `replay` passed with 20 ticks + 6 proposals, grade `real`, and replay digest `77ee6d0a7018285b3789daf8f442fb7c9a9294dc6284babbd6e3165799752e26`.
+- `npm run ci` wrapper was not usable on this PowerShell 5.1 host because its package script contains `&&`; all commands in that wrapper were run individually and passed. This host-shell limitation is retained as evidence, not hidden as a green aggregate.
+
+### Governance and hosted state
+
+- Branch: `work/DT-WP-03-QUANT-STRATEGY`; PR #7 remains open and unmerged.
+- No live money, authenticated broker execution, buy/sell endpoint, `proposal_open_contract`, production Risk Engine, or final UI was added.
+- UADS Work Order `wo_f0677a7583b6499e` exists, but model routing is `BLOCKED` (`NO_ELIGIBLE_MODEL`) and reviewer execution is unavailable (`NO_CONFIGURED_BACKEND`, fail-closed). No independent review was simulated or self-approved.
+- Required disposition after push: stop for independent ChatGPT exact-head re-review. Local green gates are not approval and do not authorize merge.
