@@ -43,11 +43,17 @@ Thumbs.db
 supabase/.branches/
 supabase/.temp/
 
-# Local data runtime (keep intentional fixtures only)
+# Local data runtime (keep intentional fixtures only).
+# Committed fixtures live under packages/*/fixtures/; everything generated
+# under data/ at runtime (partitions, manifests, quarantine) stays local.
 data/*.parquet
 data/*.duckdb
 data/*.db
 data/*.sqlite
+data/normalized/
+data/proposals/
+data/manifests/
+data/quarantine/
 data/runtime/
 data/tmp/
 !data/.gitkeep

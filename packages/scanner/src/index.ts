@@ -1,6 +1,7 @@
 /**
- * Scanner boundary (DT-WP-01 Phase F).
- * Exposes scan request/result shapes without a payout engine.
+ * Scanner package entry (DT-WP-02).
+ * Eligibility engine, opportunity lattice and payout pulse. No strategy
+ * direction logic. Legacy scan shapes kept for compatibility.
  */
 import type { ExpirySeconds } from "@deriv-trader/domain";
 import type { Tick } from "@deriv-trader/market-data";
@@ -23,3 +24,14 @@ export interface ScanResult {
 export function ineligible(request: ScanRequest, reason: string): ScanResult {
   return { request, verdict: "INELIGIBLE", reason, tick: null };
 }
+
+export { PayoutPulseScheduler, DEFAULT_PULSE_CONFIG } from "./pulse.js";
+export type { PulseBudget, PulseCandidate, PulseConfig, PulsePriority } from "./pulse.js";
+export { evaluateEligibility, eligibilityFromSnapshot, buildOpportunity } from "./eligibility.js";
+export type {
+  EligibilityInput,
+  EligibilityResult,
+  EligibilityState,
+  Opportunity,
+  OpportunityInput,
+} from "./eligibility.js";

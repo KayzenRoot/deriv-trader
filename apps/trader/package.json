@@ -12,13 +12,21 @@
   },
   "dependencies": {
     "@deriv-trader/config": "0.1.0",
+    "@deriv-trader/db": "0.1.0",
+    "@deriv-trader/deriv-adapter": "0.1.0",
     "@deriv-trader/domain": "0.1.0",
     "@deriv-trader/events": "0.1.0",
+    "@deriv-trader/market-data": "0.1.0",
+    "@deriv-trader/research": "0.1.0",
+    "@deriv-trader/scanner": "0.1.0",
     "fastify": "5.12.5",
+    "ws": "8.21.3",
     "zod": "4.6.5"
   },
   "devDependencies": {
+    "@deriv-trader/testing": "0.1.0",
     "@types/node": "24.13.5",
+    "@types/ws": "8.18.1",
     "typescript": "6.0.3",
     "vitest": "5.0.1"
   }

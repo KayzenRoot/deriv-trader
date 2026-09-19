@@ -5,6 +5,9 @@
 import { loadConfig } from "@deriv-trader/config";
 import { startTraderService } from "./server.js";
 
+export { MarketScannerRuntime, PARSER_VERSION } from "./runtime.js";
+export type { RuntimeOptions, OpportunitiesSnapshot } from "./runtime.js";
+
 async function main(): Promise<void> {
   const config = loadConfig();
   const service = await startTraderService({ config, logger: true });
