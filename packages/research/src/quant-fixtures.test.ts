@@ -29,6 +29,6 @@ describe("committed quant fixtures", () => {
       expect(verdict.state).toBe("RETEST_REQUIRED");
     }
     expect(first.ledger.attempts.length).toBe(second.ledger.attempts.length);
-    expect(first.ledger.attempts.every((a) => a.fold !== "test")).toBe(true);
+    expect(first.ledger.attempts.every((a) => a.fold !== "test" || a.access === "measure")).toBe(true);
   }, 300000);
 });

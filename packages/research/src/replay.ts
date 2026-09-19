@@ -1,8 +1,8 @@
 /**
- * Deterministic replay / backtest engine (DT-WP-03 §4).
- * Two separated modes: market-only (direction study, payout UNKNOWN) and
- * proposal-aware (as-of join of captured snapshots at decision time only).
- * Monotonic event clock, tolerance-bounded settlement lookup, run manifests.
+ * Deterministic replay / backtest engine (DT-WP-03 §4, CORRECTION 001).
+ * Symbol-bound throughout: per-symbol cadence, per-symbol settlement, exact
+ * symbol delivery to runners, explicit same-timestamp ordering. Proposal joins
+ * are TTL-gated by a versioned economics policy. Digests bind full identity.
  *
  * Flow per decision: SFG snapshot (past data only) -> strategy direction
  * vote -> as-of proposal join for the CHOSEN direction -> settlement lookup
@@ -16,16 +16,36 @@ export type ReplayMode = "market-only" | "proposal-aware";
 
 export type OutcomeLabel = "UP" | "DOWN" | "FLAT" | "UNKNOWN";
 
+export const REPLAY_ECONOMICS_VERSION = "replay-econ-1";
+
+/**
+ * Default proposal TTL for synthetic research runs: a KNOWN proposal only
+ * counts as monetary evidence for decisions within 60s of its receipt.
+ * Real-history runs must justify their own TTL explicitly.
+ */
+export const DEFAULT_PROPOSAL_TTL_MS = 60_000;
+
+export interface ReplayEconomicsPolicy {
+  readonly version: string;
+  readonly proposalTtlMs: number;
+  readonly amount: number;
+  readonly currency: string;
+  readonly basis: string;
+}
+
 export interface ReplayDecision {
   readonly time: number;
   readonly signal: "SIGNAL_CALL" | "SIGNAL_PUT" | "NO_SIGNAL";
   readonly strategyId: string;
+  readonly runnerId: string;
   readonly instrument: string;
   readonly expirySeconds: 60 | 180 | 300;
   readonly presetVersion: string;
   readonly featureHash: string;
   readonly quality: number;
   readonly proposalKey: string | null;
+  readonly proposalReceivedAt: string | null;
+  readonly proposalAgeMs: number | null;
   readonly effectivePayout: number | null;
   readonly breakEven: number | null;
   readonly reason: string;
@@ -46,8 +66,10 @@ export interface ReplayManifest {
   readonly datasetHash: string;
   readonly featureVersion: string;
   readonly strategyVersions: Record<string, string>;
-  readonly presetVersion: string;
+  readonly presetVersions: Record<string, string>;
   readonly configHash: string;
+  readonly economicsPolicy: string;
+  readonly proposalTtlMs: number;
   readonly seed: number;
   readonly decisions: number;
   readonly decisionsHash: string;
@@ -55,19 +77,26 @@ export interface ReplayManifest {
   readonly toTime: number;
 }
 
-/** Latest valid proposal at or before decision time for the exact key. */
+/**
+ * Latest exact-key KNOWN proposal at or before decision time with age <= TTL
+ * and complete economics. Anything else is not monetary evidence.
+ */
 export function joinProposal(
   proposals: readonly ProposalQuote[],
   key: string,
   decisionTimeMs: number,
+  ttlMs: number,
 ): ProposalQuote | null {
   let best: ProposalQuote | null = null;
   let bestAt = -1;
   for (const quote of proposals) {
     if (quote.key !== key) continue;
     if (quote.state !== "KNOWN") continue;
+    if (quote.askPrice === null || quote.payout === null) continue;
+    if (quote.effectivePayout === null || quote.breakEven === null) continue;
     const at = Date.parse(quote.receivedAt);
     if (!Number.isFinite(at) || at > decisionTimeMs) continue;
+    if (decisionTimeMs - at > ttlMs) continue;
     if (at >= bestAt) {
       bestAt = at;
       best = quote;
@@ -76,9 +105,13 @@ export function joinProposal(
   return best;
 }
 
-/** Settlement lookup at/after target within tolerance; UNKNOWN when thin. */
+/**
+ * Settlement lookup at/after target within tolerance, restricted to the exact
+ * symbol. Ticks from other instruments can never settle this decision.
+ */
 export function settle(
   ticks: readonly MarketTick[],
+  underlyingSymbol: string,
   entryQuote: number,
   targetTime: number,
   toleranceSeconds: number,
@@ -86,6 +119,7 @@ export function settle(
 ): { label: OutcomeLabel; quote: number | null } {
   let candidate: MarketTick | null = null;
   for (const tick of ticks) {
+    if (tick.underlyingSymbol !== underlyingSymbol) continue;
     if (tick.eventTime < targetTime) continue;
     if (tick.eventTime - targetTime > toleranceSeconds) break;
     candidate = tick;
@@ -103,7 +137,12 @@ export interface ReplayRunner {
   readonly runnerId: string;
   readonly expirySeconds: 60 | 180 | 300;
   readonly presetVersion: string;
-  decide: (features: FeatureSnapshot) => {
+  decide: (args: {
+    symbol: string;
+    time: number;
+    tick: MarketTick;
+    features: FeatureSnapshot;
+  }) => {
     signal: ReplayDecision["signal"];
     quality: number;
     reason: string;
@@ -120,9 +159,7 @@ export interface ReplayInput {
   readonly stepTicks: number;
   readonly settlementToleranceSeconds: number;
   readonly flatEpsilon: number;
-  readonly proposalAmount: number;
-  readonly proposalCurrency: string;
-  readonly proposalBasis: string;
+  readonly economics: ReplayEconomicsPolicy;
   readonly codeVersion: string;
   readonly datasetHash: string;
   readonly featureVersion: string;
@@ -135,86 +172,140 @@ export interface ReplayOutput {
   readonly manifest: ReplayManifest;
 }
 
-/** Deterministic replay: chronological, no future access, stable manifest. */
+/**
+ * Deterministic replay. Ticks are grouped per symbol (each group sorted);
+ * cadence steps each symbol independently so one symbol's density never
+ * shifts another's decisions. Same-timestamp ticks order by symbol, then
+ * decisions merge by (time, runnerId). No future access anywhere.
+ */
 export function runReplay(input: ReplayInput): ReplayOutput {
-  const ticks = [...input.ticks]
-    .filter((t) => t.eventTime >= input.fromTime && t.eventTime <= input.toTime)
-    .sort((a, b) => a.eventTime - b.eventTime || a.sequence - b.sequence);
+  const bySymbol = new Map<string, MarketTick[]>();
+  for (const tick of input.ticks) {
+    if (tick.eventTime < input.fromTime || tick.eventTime > input.toTime) continue;
+    const group = bySymbol.get(tick.underlyingSymbol) ?? [];
+    group.push(tick);
+    bySymbol.set(tick.underlyingSymbol, group);
+  }
+  const symbols = [...bySymbol.keys()].sort();
+  for (const group of bySymbol.values()) {
+    group.sort((a, b) => a.eventTime - b.eventTime || a.sequence - b.sequence);
+  }
   const orderedRunners = [...input.runners].sort((a, b) => (a.runnerId < b.runnerId ? -1 : 1));
   const graph = new SharedFeatureGraph(2000);
   const settled: SettledDecision[] = [];
-  for (let i = 0; i < ticks.length; i += 1) {
-    const tick = ticks[i];
-    if (!tick) continue;
-    graph.ingest(tick);
-    if (i % Math.max(1, input.stepTicks) !== 0) continue;
-    const snapshot = graph.snapshot(tick.underlyingSymbol, tick.eventTime, input.datasetHash);
-    for (const runner of orderedRunners) {
-      let vote: { signal: ReplayDecision["signal"]; quality: number; reason: string };
-      if (!snapshot) {
-        vote = { signal: "NO_SIGNAL", quality: 0, reason: "insufficient history" };
-      } else {
-        vote = runner.decide(snapshot);
-      }
-      let proposalKey: string | null = null;
-      let effectivePayout: number | null = null;
-      let breakEven: number | null = null;
-      if (input.mode === "proposal-aware" && vote.signal !== "NO_SIGNAL" && snapshot) {
-        const direction = vote.signal === "SIGNAL_CALL" ? "CALL" : "PUT";
-        const key = [
-          tick.underlyingSymbol,
-          direction,
-          String(runner.expirySeconds),
-          input.proposalCurrency,
-          input.proposalBasis,
-          String(input.proposalAmount),
-        ].join("|");
-        const quote = joinProposal(input.proposals, key, tick.eventTime * 1000);
-        if (quote) {
-          proposalKey = quote.key;
-          effectivePayout = quote.effectivePayout;
-          breakEven = quote.breakEven;
+  for (const symbol of symbols) {
+    const stream = bySymbol.get(symbol) ?? [];
+    for (let i = 0; i < stream.length; i += 1) {
+      const tick = stream[i];
+      if (!tick) continue;
+      graph.ingest(tick);
+      // Per-symbol cadence: position counts this symbol's ticks only, so one
+      // symbol's density never shifts another symbol's decisions.
+      if (i % Math.max(1, input.stepTicks) !== 0) continue;
+      const snapshot = graph.snapshot(symbol, tick.eventTime, input.datasetHash);
+      for (const runner of orderedRunners) {
+        let vote: { signal: ReplayDecision["signal"]; quality: number; reason: string };
+        if (!snapshot) {
+          vote = { signal: "NO_SIGNAL", quality: 0, reason: "insufficient history" };
+        } else {
+          vote = runner.decide({ symbol, time: tick.eventTime, tick, features: snapshot });
         }
+        let proposalKey: string | null = null;
+        let proposalReceivedAt: string | null = null;
+        let proposalAgeMs: number | null = null;
+        let effectivePayout: number | null = null;
+        let breakEven: number | null = null;
+        if (input.mode === "proposal-aware" && vote.signal !== "NO_SIGNAL" && snapshot) {
+          const direction = vote.signal === "SIGNAL_CALL" ? "CALL" : "PUT";
+          const key = [
+            symbol,
+            direction,
+            String(runner.expirySeconds),
+            input.economics.currency,
+            input.economics.basis,
+            String(input.economics.amount),
+          ].join("|");
+          const quote = joinProposal(
+            input.proposals,
+            key,
+            tick.eventTime * 1000,
+            input.economics.proposalTtlMs,
+          );
+          if (quote) {
+            proposalKey = quote.key;
+            proposalReceivedAt = quote.receivedAt;
+            proposalAgeMs = tick.eventTime * 1000 - Date.parse(quote.receivedAt);
+            effectivePayout = quote.effectivePayout;
+            breakEven = quote.breakEven;
+          }
+        }
+        const targetTime = tick.eventTime + runner.expirySeconds;
+        const { label } = settle(
+          stream.slice(i + 1),
+          symbol,
+          tick.quote,
+          targetTime,
+          input.settlementToleranceSeconds,
+          input.flatEpsilon,
+        );
+        settled.push({
+          time: tick.eventTime,
+          signal: vote.signal,
+          strategyId: runner.strategyId,
+          runnerId: runner.runnerId,
+          instrument: symbol,
+          expirySeconds: runner.expirySeconds,
+          presetVersion: runner.presetVersion,
+          featureHash: snapshot?.hash ?? "none",
+          quality: vote.quality,
+          proposalKey,
+          proposalReceivedAt,
+          proposalAgeMs,
+          effectivePayout,
+          breakEven,
+          reason: vote.reason,
+          targetTime,
+          label,
+          realized:
+            input.mode === "proposal-aware" && label !== "UNKNOWN"
+              ? realizedPnl(vote.signal, label, effectivePayout)
+              : null,
+          points:
+            input.mode === "market-only" && label !== "UNKNOWN"
+              ? directionalPoints(vote.signal, label)
+              : null,
+        });
       }
-      const targetTime = tick.eventTime + runner.expirySeconds;
-      const { label } = settle(
-        ticks.slice(i + 1),
-        tick.quote,
-        targetTime,
-        input.settlementToleranceSeconds,
-        input.flatEpsilon,
-      );
-      settled.push({
-        time: tick.eventTime,
-        signal: vote.signal,
-        strategyId: runner.strategyId,
-        instrument: tick.underlyingSymbol,
-        expirySeconds: runner.expirySeconds,
-        presetVersion: runner.presetVersion,
-        featureHash: snapshot?.hash ?? "none",
-        quality: vote.quality,
-        proposalKey,
-        effectivePayout,
-        breakEven,
-        reason: vote.reason,
-        targetTime,
-        label,
-        realized:
-          input.mode === "proposal-aware" && label !== "UNKNOWN"
-            ? realizedPnl(vote.signal, label, effectivePayout)
-            : null,
-        points:
-          input.mode === "market-only" && label !== "UNKNOWN"
-            ? directionalPoints(vote.signal, label)
-            : null,
-      });
     }
   }
+  settled.sort((a, b) => a.time - b.time || (a.runnerId < b.runnerId ? -1 : 1));
   const decisionsHash = createHash("sha256")
-    .update(JSON.stringify(settled.map((d) => [d.time, d.strategyId, d.signal, d.label, d.reason])))
+    .update(
+      JSON.stringify(
+        settled.map((d) => [
+          d.time,
+          d.runnerId,
+          d.strategyId,
+          d.instrument,
+          d.expirySeconds,
+          d.presetVersion,
+          d.featureHash,
+          d.signal,
+          d.proposalKey,
+          d.proposalReceivedAt,
+          d.effectivePayout,
+          d.label,
+          d.reason,
+        ]),
+      ),
+    )
     .digest("hex");
   const versions: Record<string, string> = {};
-  for (const runner of orderedRunners) versions[runner.strategyId] = runner.strategyVersion;
+  const presetVersions: Record<string, string> = {};
+  for (const runner of orderedRunners) {
+    versions[runner.strategyId] = runner.strategyVersion;
+    presetVersions[runner.runnerId] = runner.presetVersion;
+  }
   return {
     decisions: settled,
     manifest: {
@@ -223,8 +314,10 @@ export function runReplay(input: ReplayInput): ReplayOutput {
       datasetHash: input.datasetHash,
       featureVersion: input.featureVersion,
       strategyVersions: versions,
-      presetVersion: "seed-1",
+      presetVersions,
       configHash: input.configHash,
+      economicsPolicy: input.economics.version,
+      proposalTtlMs: input.economics.proposalTtlMs,
       seed: input.seed,
       decisions: settled.length,
       decisionsHash,

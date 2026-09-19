@@ -6,7 +6,7 @@
  */
 import { z } from "zod";
 import type { StrategyInput, StrategyOutput } from "./engine.js";
-import { noSignal, pBeOf } from "./engine.js";
+import { noSignal, pBeOf, preflight } from "./engine.js";
 
 export const STRATEGY_ID = "micro_pressure";
 export const STRATEGY_VERSION = "1.0.0";
@@ -26,6 +26,8 @@ export function decideMicroPressure(
   input: StrategyInput,
   preset: MicroPressurePreset,
 ): StrategyOutput {
+  const blocked = preflight(input);
+  if (blocked) return blocked;
   const v = input.features.values;
   if (input.features.anomaly) return noSignal(input, "OUTLIER_FILTER", "micro-burst outlier rejected");
   const imbalance = v["persistence_20"] ?? 0;

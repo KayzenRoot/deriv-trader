@@ -89,3 +89,21 @@ export function pBeOf(proposal: StrategyInput["proposal"]): number | null {
   if (!payout || !askPrice) return null;
   return askPrice / payout;
 }
+
+export const PREFLIGHT_MIN_BARS = 51;
+
+/**
+ * Common strategy preflight (F3): every family runs this before its own
+ * logic. STALE/GAPPED/UNTRUSTED quality or insufficient history fail closed
+ * to NO_SIGNAL with explicit codes. Returns null when input may proceed.
+ */
+export function preflight(input: StrategyInput): StrategyOutput | null {
+  const freshness = input.features.freshness;
+  if (freshness === "STALE") return noSignal(input, "STALE_INPUT", "stale market input");
+  if (freshness === "GAPPED") return noSignal(input, "GAPPED_INPUT", "gapped market input");
+  if (freshness === "UNTRUSTED") return noSignal(input, "UNTRUSTED_INPUT", "untrusted market input");
+  if (input.features.windowBars < PREFLIGHT_MIN_BARS) {
+    return noSignal(input, "INSUFFICIENT_HISTORY", "insufficient history for full features");
+  }
+  return null;
+}

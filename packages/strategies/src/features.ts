@@ -9,14 +9,20 @@ import type { MarketTick } from "@deriv-trader/domain";
 
 export const FEATURE_VERSION = "sfg-1";
 
+export type FeatureQuality = "FRESH" | "AGING" | "STALE" | "GAPPED" | "UNTRUSTED";
+
 export interface FeatureSnapshot {
   readonly featureVersion: string;
   readonly symbol: string;
   readonly eventTime: number;
   readonly provenance: string;
   readonly values: Record<string, number>;
-  readonly freshness: "FRESH" | "STALE";
+  readonly freshness: FeatureQuality;
   readonly anomaly: boolean;
+  /** Ticks actually used in windows (after exclusions). */
+  readonly windowBars: number;
+  /** Ticks excluded for duplicate/out-of-order/untrusted flags. */
+  readonly excludedTicks: number;
   readonly hash: string;
 }
 
@@ -80,11 +86,21 @@ function rsiLike(gains: number[], losses: number[]): number {
 export interface FeatureOptions {
   readonly windows?: readonly number[];
   readonly anomalyJump?: number;
+  /** Age thresholds (ms of event time) for FRESH/AGING/STALE derivation. */
+  readonly freshMs?: number;
+  readonly agingMs?: number;
+  /** Minimum bars for a complete feature set; fewer still computes. */
+  readonly minBars?: number;
 }
+
+export const FEATURE_MIN_BARS = 51;
 
 /**
  * Compute the full primitive set over ticks at or before `atTime`.
- * Returns null when history is insufficient for the largest window.
+ * Quality derives from real input: duplicate/out-of-order/untrusted ticks are
+ * excluded openly (counted, never silently included); gaps and age set the
+ * freshness verdict. Returns null only when no usable tick exists at all —
+ * callers treat thin windows via windowBars + preflight, not fabrication.
  */
 export function computeFeatures(
   ticks: readonly MarketTick[],
@@ -94,12 +110,23 @@ export function computeFeatures(
   options: FeatureOptions = {},
 ): FeatureSnapshot | null {
   const windows = options.windows ?? [5, 10, 20, 50];
-  const maxWindow = Math.max(...windows);
   const jumpThreshold = options.anomalyJump ?? 0.02;
-  const past = ticks
-    .filter((t) => t.underlyingSymbol === symbol && t.eventTime <= atTime)
+  const freshMs = (options.freshMs ?? 5000) / 1000;
+  const agingMs = (options.agingMs ?? 15000) / 1000;
+  const usable = ticks.filter((t) => t.underlyingSymbol === symbol && t.eventTime <= atTime);
+  if (usable.length === 0) return null;
+  // Stale ticks never enter windows (counted in excludedTicks instead). A
+  // stale latest tick still marks the whole snapshot UNTRUSTED below.
+  const excluded = usable.filter((t) => t.duplicate || t.outOfOrder || t.stale).length;
+  const latest = [...usable].sort((a, b) => a.eventTime - b.eventTime || a.sequence - b.sequence).pop();
+  const untrusted = latest?.stale ?? false;
+  const past = usable
+    .filter((t) => !t.duplicate && !t.outOfOrder && !t.stale)
     .sort((a, b) => a.eventTime - b.eventTime || a.sequence - b.sequence);
-  if (past.length < maxWindow + 1) return null;
+  if (past.length === 0) return null;
+  const lastTick = past[past.length - 1];
+  if (!lastTick) return null;
+  const ageSeconds = atTime - lastTick.eventTime;
   const closes = past.map((t) => t.quote);
   const values: Record<string, number> = {};
   const last = closes[closes.length - 1] ?? 0;
@@ -165,53 +192,84 @@ export function computeFeatures(
   const slope20 = values["slope_20"] ?? 0;
   values["acceleration"] = slope10 - slope20;
 
-  const firstTime = past[0]?.eventTime ?? atTime;
-  const lastTime = past[past.length - 1]?.eventTime ?? atTime;
-  const spanSeconds = lastTime - firstTime;
-  values["tick_rate_50"] = spanSeconds <= 0 ? 0 : Math.min(50, past.length) / spanSeconds;
+  // F14: rate over the actual last-50-tick window, never the whole history.
+  const recent50 = past.slice(-50);
+  const firstRecent = recent50[0]?.eventTime ?? atTime;
+  const lastRecent = recent50[recent50.length - 1]?.eventTime ?? atTime;
+  const spanSeconds = lastRecent - firstRecent;
+  values["tick_rate_50"] = spanSeconds <= 0 ? 0 : recent50.length / spanSeconds;
   const perTick = logrets.slice(-10);
   values["price_change_per_tick_10"] = mean(perTick.map((c) => Math.abs(c)));
   const net = Math.abs(perTick.reduce((a, b) => a + b, 0));
   const gross = perTick.reduce((a, b) => a + Math.abs(b), 0);
   values["efficiency_10"] = gross === 0 ? 0 : net / gross;
 
-  const range = high - low;
-  values["compression_50"] = last === 0 ? 0 : range / last / Math.max(1e-12, values["volatility_50"] ?? 0);
-  values["expansion_ratio"] = (values["volatility_20"] ?? 0) / Math.max(1e-12, values["volatility_50"] ?? 0);
+  // Compression compares the earlier regime window against the recent window:
+  // values well below 1 mean a quiet past breaking into a wider present.
+  const prior = closes.slice(-50, -10);
+  const recent = closes.slice(-10);
+  const priorRange = prior.length === 0 ? 0 : Math.max(...prior) - Math.min(...prior);
+  const recentRange = recent.length === 0 ? 0 : Math.max(...recent) - Math.min(...recent);
+  values["compression_50"] = recentRange <= 0 ? 1 : priorRange / recentRange;
+  const priorMoves = logrets.slice(0, Math.max(0, logrets.length - 5)).map((c) => Math.abs(c));
+  const recentMoves = logrets.slice(-5).map((c) => Math.abs(c));
+  values["expansion_ratio"] =
+    mean(priorMoves) <= 0 ? 1 : mean(recentMoves) / Math.max(1e-12, mean(priorMoves));
 
+  const tail15 = closes.slice(-15);
+  values["recent_high_15"] = Math.max(...tail15);
+  values["recent_low_15"] = Math.min(...tail15);
+  values["last_close"] = closes.length > 0 ? (closes[closes.length - 1] ?? 0) : 0;
   // Adaptive Price Anchor: EMA-anchored level (explicitly NOT VWAP — no volume).
+  // Pullback depth is measured from recent extremes (recent_high/low_15),
+  // not from a second anchor, to keep one trend-value reference.
   const anchor = ema(closes.slice(-50), 20);
   values["anchor_ema20_50"] = anchor;
   values["anchor_distance"] = anchor === 0 ? 0 : (last - anchor) / anchor;
 
-  let anomaly = false;
+  let anomaly = excluded > 0;
   for (const c of logrets.slice(-3)) {
     if (Math.abs(c) > jumpThreshold) anomaly = true;
   }
+  const freshness: FeatureSnapshot["freshness"] = untrusted
+    ? "UNTRUSTED"
+    : lastTick.gap
+      ? "GAPPED"
+      : ageSeconds > agingMs
+        ? "STALE"
+        : ageSeconds > freshMs
+          ? "AGING"
+          : "FRESH";
   const snapshot: Omit<FeatureSnapshot, "hash"> = {
     featureVersion: FEATURE_VERSION,
     symbol,
     eventTime: atTime,
     provenance,
     values,
-    freshness: "FRESH",
+    freshness,
     anomaly,
+    windowBars: past.length,
+    excludedTicks: excluded,
   };
   return { ...snapshot, hash: hashSnapshot(snapshot) };
 }
 
 export function hashSnapshot(snapshot: Omit<FeatureSnapshot, "hash">): string {
   const keys = Object.keys(snapshot.values).sort();
-  const canonical = `${snapshot.featureVersion}|${snapshot.symbol}|${String(snapshot.eventTime)}|${snapshot.provenance}|${keys.map((k) => `${k}=${String(snapshot.values[k] ?? 0)}`).join(",")}|${snapshot.freshness}|${String(snapshot.anomaly)}`;
+  const canonical = `${snapshot.featureVersion}|${snapshot.symbol}|${String(snapshot.eventTime)}|${snapshot.provenance}|${keys.map((k) => `${k}=${String(snapshot.values[k] ?? 0)}`).join(",")}|${snapshot.freshness}|${String(snapshot.anomaly)}|${String(snapshot.windowBars)}|${String(snapshot.excludedTicks)}`;
   return createHash("sha256").update(canonical, "utf8").digest("hex");
 }
 
 /**
  * Shared Feature Graph: bounded per-symbol ring buffers, one computation per
- * symbol/time, immutable snapshots fanned out to all Runners.
+ * symbol/time, immutable snapshots fanned out to all Runners. Snapshots are
+ * cached by symbol + eventTime + provenance + options/version: a second
+ * Runner requesting the same snapshot never recomputes. Ingest invalidates
+ * only that symbol's entries.
  */
 export class SharedFeatureGraph {
   private readonly buffers = new Map<string, MarketTick[]>();
+  private readonly cache = new Map<string, FeatureSnapshot>();
   private readonly capacity: number;
   private computations = 0;
 
@@ -224,6 +282,24 @@ export class SharedFeatureGraph {
     buffer.push(tick);
     if (buffer.length > this.capacity) buffer.splice(0, buffer.length - this.capacity);
     this.buffers.set(tick.underlyingSymbol, buffer);
+    // Invalidate only this symbol's cached snapshots (new data arrived).
+    for (const key of [...this.cache.keys()]) {
+      if (key.startsWith(`${tick.underlyingSymbol}|`)) this.cache.delete(key);
+    }
+  }
+
+  private cacheKey(symbol: string, atTime: number, provenance: string, options: FeatureOptions): string {
+    const windows = [...(options.windows ?? [5, 10, 20, 50])].sort((a, b) => a - b);
+    return [
+      symbol,
+      String(atTime),
+      provenance,
+      FEATURE_VERSION,
+      windows.join(","),
+      String(options.anomalyJump ?? 0.02),
+      String(options.freshMs ?? 5000),
+      String(options.agingMs ?? 15000),
+    ].join("|");
   }
 
   snapshot(
@@ -232,8 +308,13 @@ export class SharedFeatureGraph {
     provenance: string,
     options: FeatureOptions = {},
   ): FeatureSnapshot | null {
+    const key = this.cacheKey(symbol, atTime, provenance, options);
+    const cached = this.cache.get(key);
+    if (cached) return cached;
     this.computations += 1;
-    return computeFeatures(this.buffers.get(symbol) ?? [], symbol, atTime, provenance, options);
+    const snapshot = computeFeatures(this.buffers.get(symbol) ?? [], symbol, atTime, provenance, options);
+    if (snapshot) this.cache.set(key, snapshot);
+    return snapshot;
   }
 
   computationCount(): number {

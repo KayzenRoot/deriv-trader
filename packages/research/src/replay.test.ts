@@ -1,7 +1,14 @@
 import { describe, expect, it } from "vitest";
 import type { MarketTick, ProposalQuote } from "@deriv-trader/domain";
 import { generateProposals, generateTicks } from "./dataset.js";
-import { joinProposal, runReplay, settle, type ReplayRunner } from "./replay.js";
+import {
+  DEFAULT_PROPOSAL_TTL_MS,
+  joinProposal,
+  REPLAY_ECONOMICS_VERSION,
+  runReplay,
+  settle,
+  type ReplayRunner,
+} from "./replay.js";
 import { chronologicalSplit, FinalTestLock, foldOf, overlaps } from "./splits.js";
 
 function dataset(seed = 42): { ticks: MarketTick[]; proposals: ProposalQuote[] } {
@@ -42,9 +49,13 @@ const BASE = {
   stepTicks: 10,
   settlementToleranceSeconds: 10,
   flatEpsilon: 0,
-  proposalAmount: 10,
-  proposalCurrency: "USD",
-  proposalBasis: "stake",
+  economics: {
+    version: REPLAY_ECONOMICS_VERSION,
+    proposalTtlMs: DEFAULT_PROPOSAL_TTL_MS,
+    amount: 10,
+    currency: "USD",
+    basis: "stake",
+  },
   codeVersion: "test-1",
   datasetHash: "ds-test",
   featureVersion: "sfg-1",
@@ -91,16 +102,20 @@ describe("deterministic replay", () => {
     // Same key, one past + one future: the past snapshot wins.
     const key = proposals[0]?.key ?? "";
     const at = Date.parse(proposals[0]?.receivedAt ?? "") + 1;
-    expect(joinProposal(proposals, key, at)?.proposalId).toBe(proposals[0]?.proposalId);
-    expect(joinProposal(future, key, at)).toBeNull();
+    expect(joinProposal(proposals, key, at, DEFAULT_PROPOSAL_TTL_MS)?.proposalId).toBe(
+      proposals[0]?.proposalId,
+    );
+    expect(joinProposal(future, key, at, DEFAULT_PROPOSAL_TTL_MS)).toBeNull();
+    // Stale by TTL: the same past quote no longer counts as evidence.
+    expect(joinProposal(proposals, key, at + DEFAULT_PROPOSAL_TTL_MS + 1000, DEFAULT_PROPOSAL_TTL_MS)).toBeNull();
   });
 
   it("labels UNKNOWN when settlement evidence is thin", () => {
-    const { label } = settle([], 100, 1_700_000_100, 10, 0);
+    const { label } = settle([], "SYNTH", 100, 1_700_000_100, 10, 0);
     expect(label).toBe("UNKNOWN");
     const { ticks } = dataset();
     const near = ticks.filter((t) => t.eventTime >= 1_700_000_100 && t.eventTime <= 1_700_000_105);
-    const far = settle(near, 100, 1_700_100_000, 5, 0);
+    const far = settle(near, "SYNTH", 100, 1_700_100_000, 5, 0);
     expect(far.label).toBe("UNKNOWN");
   });
 

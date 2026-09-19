@@ -2,7 +2,7 @@
 
 Status: READY_FOR_REVIEW (executor verdict; ChatGPT review owns APPROVED)
 Risk: HIGH_ASSURANCE — research/strategies only, no economic execution
-Work Order: DT-WP-03-QUANT-STRATEGY
+Work Order: DT-WP-03-QUANT-STRATEGY (+ CORRECTION-001 review findings)
 Base checkpoint: DT-CP-0006
 
 ## 1. Canonical base and branch
@@ -79,7 +79,7 @@ CLI `matrix --seed 42` (also covered in-process by tests): all 15 profiles `RETE
 
 ## 14. Test counts + CI run IDs
 
-- Local: 26 files / 120 tests green, stable across repeats
+- Local: 26 files / 123 tests green, stable across repeats
 - Final head `5a70588` (PR #7 https://github.com/KayzenRoot/deriv-trader/pull/7):
   product push run `35417447361` SUCCESS; product PR run `35417449775` SUCCESS;
   governance PR run `35417449779` SUCCESS (all 2026-09-19 on
@@ -88,6 +88,25 @@ CLI `matrix --seed 42` (also covered in-process by tests): all 15 profiles `RETE
   an evidence-only commit; CI re-runs on the new tip and its run IDs are
   confirmed SUCCESS before stopping (see final executor report)
 - CI failure analyzed and fixed during execution: push run `35416922434` failed the R7 lifecycle test on the slower runner (one shared overlap flag let a slow capture starve universe/pulse ticks). Fixed with per-task overlap guards plus skip accounting and per-task concurrency proof; the test uses short real intervals with poll-to-condition instead of fake timers fighting real async I/O. Re-verified locally (3× green) before push.
+
+## 18. CORRECTION-001 dispositions (review findings F1–F17)
+
+- F1/F2 replay integrity: symbol-bound replay (per-symbol cadence, per-symbol settlement, exact symbol delivery, ordered same-timestamp handling); proposal joins TTL-gated by versioned economics policy (`replay-econ-1`, default TTL 60s); digests bind full identity. Unit-proven: stale-by-TTL quotes rejected, future quotes never joined.
+- F3 SFG quality + preflight: duplicate/out-of-order/stale ticks excluded openly and counted (`excludedTicks`); stale latest tick → UNTRUSTED; common `preflight` (51-bar floor, STALE/GAPPED/UNTRUSTED refusal) runs first in all five families. Unit-proven incl. UNTRUSTED_INPUT refusal.
+- F4/F7 admission + fold handles: ledger tags every attempt with fold + access (`search` dev-only; `measure`/`calibration` tagged per fold); sealed test fold measured exactly once per profile, never searched (asserted: no `search` access on test).
+- F5 calibration + edge in OOS: dev-fold calibration probe recorded in ledger (`access: calibration`); outputs keep `p_hat: null`; edge math unchanged and exact.
+- F6 baselines / walk-forward / stress: constant-CALL passive baseline per expiry on dev (ledger `measure` rows, `devBaselineExpectancy` per verdict); winner walk-forward triple dev/validation/test per verdict; 20% payout-haircut stress per OOS (`oosStressedExpectancy`, pure helper unit-tested).
+- F8/F9 simulator: `toSimulatorSignals` uses real expiry-specific runner identity (cooldown/accounting no longer conflates expiries); ordering, caps, cooldown, daily stops unit-proven.
+- F10 presets: expiry-specific seed identity (`seed-1+<family>+<expiry>s` + hash); strict 12-variant total budget incl. seed.
+- F11 cache: per-symbol snapshot cache with per-symbol invalidation, keyed by symbol/time/provenance/version/options.
+- F13 fixtures: exact-behavior strategy fixtures (pullback CALL at displacement / NO_RESUMPTION before / NO_PULLBACK after reclaim / mirrored PUT; breakout WEAK_HOLD then CALL; snapback research-preset CALL/PUT pair + seed-preset silence documented).
+- F14 tick rate: last-50-tick window rate, never whole-history.
+- F15 budget: `MAX_VARIANTS_PER_RUN = 12` total, seed first, deterministic order.
+- F16 Parquet loader: `readParquetTicks` ordered by (event_time, sequence) with bigint-safe coercions.
+- F17 metrics: Wilson + mean CIs, monetary/non-monetary separation, haircut stress helper.
+- CLI `--dataset synth|quant-fixture`: committed quant-v1 fixture replayable from the CLI; smoke-proven (`replay --dataset quant-fixture` → decisions=120; unknown dataset fails closed). Replay/portfolio derive symbol + time range from the loaded dataset.
+- Strategy logic corrections from fixture work: pullback trend leg on `slope_50`, resumption on `slope_5`, depth as excursion from `recent_high/low_15` with slow-anchor integrity gate; new SFG outputs `recent_high/low_15`, `last_close`.
+- Deliberately deferred (documented, not silently dropped): multi-round proposal fixtures (rounds=1 kept — no manufactured joins); rolling-window walk-forward (dev/validation/test winner triple instead); `maxSpikeMultiple` preset field reserved (spike rejection via anomaly filter).
 
 ## 15. Exact profile verdicts
 

@@ -175,7 +175,9 @@ export function toSimulatorSignals(decisions: readonly SettledDecision[]): Simul
     .filter((d) => d.signal !== "NO_SIGNAL")
     .map((d) => ({
       time: d.time,
-      runnerId: `${d.strategyId}_${d.presetVersion}`,
+      // Real runner identity: expiry-specific, so independent expiry runners
+      // never share cooldown/instrument accounting.
+      runnerId: d.runnerId,
       instrument: d.instrument,
       expirySeconds: d.expirySeconds,
       signal: d.signal as "SIGNAL_CALL" | "SIGNAL_PUT",

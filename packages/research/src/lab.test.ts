@@ -47,8 +47,19 @@ describe("quant lab pipeline", () => {
       expect(verdict.reason).toContain("synthetic");
     }
     expect(run.ledger.attempts.length).toBeGreaterThan(15);
-    expect(run.ledger.attempts.every((a) => a.fold !== "test")).toBe(true);
+    // The sealed test fold is measured exactly once per profile, never
+    // searched: tuning access stays on dev, measurement on validation/test.
+    expect(run.ledger.attempts.every((a) => a.fold !== "test" || a.access === "measure")).toBe(true);
+    expect(run.ledger.attempts.some((a) => a.fold === "test" && a.access === "measure")).toBe(true);
     expect(run.ledger.attempts.every((a) => a.cycleVersion.length > 0)).toBe(true);
+    // Every verdict carries the walk-forward triple, payout stress and baseline.
+    for (const verdict of run.verdicts) {
+      expect(verdict.walkForward).toBeDefined();
+      expect(verdict.oosStressedExpectancy === null || typeof verdict.oosStressedExpectancy === "number").toBe(true);
+      expect(
+        verdict.devBaselineExpectancy === null || typeof verdict.devBaselineExpectancy === "number",
+      ).toBe(true);
+    }
   }, 300000);
 
   it("keeps expiry profiles isolated and versioned", () => {

@@ -5,11 +5,12 @@
  * inspect | replay | matrix | sensitivity | portfolio
  * Deterministic, seeded, offline. Large outputs stay local/gitignored.
  */
-import { mkdirSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import type { MarketTick, ProposalQuote } from "@deriv-trader/domain";
 import { generateProposals, generateTicks, type SyntheticRegime } from "./dataset.js";
 import { runLab, type LabDataset } from "./lab.js";
-import { runReplay } from "./replay.js";
+import { DEFAULT_PROPOSAL_TTL_MS, REPLAY_ECONOMICS_VERSION, runReplay } from "./replay.js";
 import { makeEngine, toReplayRunner } from "./lab.js";
 import { seedPreset, ALL_PROFILES } from "@deriv-trader/strategies";
 import { orderSignals, simulate, toSimulatorSignals, SIMULATOR_POLICY_VERSION } from "./simulator.js";
@@ -38,15 +39,75 @@ function fixtureDataset(seed: number): LabDataset {
   return { ticks, proposals, datasetHash: `synth-${String(seed)}`, grade: "synthetic" };
 }
 
+function cliEconomics(): {
+  readonly version: string;
+  readonly proposalTtlMs: number;
+  readonly amount: number;
+  readonly currency: string;
+  readonly basis: string;
+} {
+  return {
+    version: REPLAY_ECONOMICS_VERSION,
+    proposalTtlMs: DEFAULT_PROPOSAL_TTL_MS,
+    amount: 10,
+    currency: "USD",
+    basis: "stake",
+  };
+}
+
 function usage(): void {
-  console.log("dt-research <inspect|replay|matrix|sensitivity|portfolio> [--seed N]");
+  console.log("dt-research <inspect|replay|matrix|sensitivity|portfolio> [--seed N] [--dataset synth|quant-fixture]");
+}
+
+interface CliArgs {
+  readonly command: string;
+  readonly seed: number;
+  readonly dataset: string;
+}
+
+function parseArgs(argv: string[]): CliArgs {
+  let command = "";
+  let seed = 42;
+  let dataset = "synth";
+  for (let i = 0; i < argv.length; i += 1) {
+    const arg = argv[i] ?? "";
+    if (arg === "--seed") {
+      seed = Number(argv[i + 1]) || 42;
+      i += 1;
+    } else if (arg === "--dataset") {
+      dataset = argv[i + 1] ?? "synth";
+      i += 1;
+    } else if (!arg.startsWith("--") && command === "") {
+      command = arg;
+    } else {
+      throw new Error(`unknown argument: ${arg}`);
+    }
+  }
+  return { command, seed, dataset };
+}
+
+/**
+ * Committed deterministic fixture (F13/CLI --dataset): the same quant-v1
+ * ticks/proposals the test suite replays. Resolved from the repo root so
+ * `dt-research` runs from the workspace root.
+ */
+function committedDataset(): LabDataset {
+  const dir = join(process.cwd(), "packages", "research", "fixtures", "quant-v1");
+  const ticks = JSON.parse(readFileSync(join(dir, "ticks.json"), "utf8")) as MarketTick[];
+  const proposals = JSON.parse(readFileSync(join(dir, "proposals.json"), "utf8")) as ProposalQuote[];
+  return { ticks, proposals, datasetHash: "quant-fixture-v1", grade: "synthetic" };
+}
+
+function loadDataset(name: string, seed: number): LabDataset {
+  if (name === "synth") return fixtureDataset(seed);
+  if (name === "quant-fixture") return committedDataset();
+  throw new Error(`unknown dataset: ${name} (expected synth|quant-fixture)`);
 }
 
 function main(): void {
-  const [command = "", seedFlag = "", seedValue = ""] = process.argv.slice(2);
-  const seed = seedFlag === "--seed" && seedValue ? Number(seedValue) || 42 : 42;
+  const { command, seed, dataset: datasetName } = parseArgs(process.argv.slice(2));
   if (command === "inspect") {
-    const dataset = fixtureDataset(seed);
+    const dataset = loadDataset(datasetName, seed);
     const dir = outDir("inspect");
     const summary = {
       ticks: dataset.ticks.length,
@@ -63,23 +124,25 @@ function main(): void {
     return;
   }
   if (command === "replay") {
-    const dataset = fixtureDataset(seed);
+    const dataset = loadDataset(datasetName, seed);
     const profile = ALL_PROFILES[0];
     if (!profile) throw new Error("no profiles");
-    const engine = makeEngine(profile.strategy, seedPreset(profile.strategy));
+    const engine = makeEngine(profile.strategy, seedPreset(profile).preset);
+    // Replay the dataset's own lead symbol and time range (works for both
+    // synthetic output and the committed quant-fixture).
+    const symbol = [...new Set(dataset.ticks.map((t) => t.underlyingSymbol))].sort()[0] ?? "SYNTH_A";
+    const times = dataset.ticks.map((t) => t.eventTime);
     const output = runReplay({
       mode: "proposal-aware",
-      ticks: dataset.ticks.filter((t) => t.underlyingSymbol === "SYNTH_A"),
+      ticks: dataset.ticks.filter((t) => t.underlyingSymbol === symbol),
       proposals: dataset.proposals,
-      runners: [toReplayRunner(engine, profile, "SYNTH_A", "seed-1")],
-      fromTime: 1_700_000_000,
-      toTime: 1_700_000_899,
+      runners: [toReplayRunner(engine, profile, symbol, "seed-1")],
+      fromTime: Math.min(...times),
+      toTime: Math.max(...times),
       stepTicks: 5,
       settlementToleranceSeconds: 10,
       flatEpsilon: 0,
-      proposalAmount: 10,
-      proposalCurrency: "USD",
-      proposalBasis: "stake",
+      economics: cliEconomics(),
       codeVersion: "wp03-cli-1",
       datasetHash: dataset.datasetHash,
       featureVersion: "sfg-1",
@@ -92,7 +155,7 @@ function main(): void {
     return;
   }
   if (command === "matrix") {
-    const dataset = fixtureDataset(seed);
+    const dataset = loadDataset(datasetName, seed);
     const run = runLab(dataset, { seed, codeVersion: "wp03-cli-1", configHash: "cli-default" });
     const dir = outDir("matrix");
     const summary = run.verdicts.map((v) => ({
@@ -110,7 +173,7 @@ function main(): void {
     return;
   }
   if (command === "sensitivity") {
-    const dataset = fixtureDataset(seed);
+    const dataset = loadDataset(datasetName, seed);
     const run = runLab(dataset, { seed, codeVersion: "wp03-cli-1", configHash: "cli-default" });
     const dir = outDir("sensitivity");
     const rows = run.verdicts.map((v) => ({
@@ -123,24 +186,24 @@ function main(): void {
     return;
   }
   if (command === "portfolio") {
-    const dataset = fixtureDataset(seed);
+    const dataset = loadDataset(datasetName, seed);
+    const symbol = [...new Set(dataset.ticks.map((t) => t.underlyingSymbol))].sort()[0] ?? "SYNTH_A";
+    const times = dataset.ticks.map((t) => t.eventTime);
     const runners = ALL_PROFILES.slice(0, 3).map((profile) => {
-      const engine = makeEngine(profile.strategy, seedPreset(profile.strategy));
-      return toReplayRunner(engine, profile, "SYNTH_A", "seed-1");
+      const engine = makeEngine(profile.strategy, seedPreset(profile).preset);
+      return toReplayRunner(engine, profile, symbol, "seed-1");
     });
     const output = runReplay({
       mode: "proposal-aware",
-      ticks: dataset.ticks.filter((t) => t.underlyingSymbol === "SYNTH_A"),
+      ticks: dataset.ticks.filter((t) => t.underlyingSymbol === symbol),
       proposals: dataset.proposals,
       runners,
-      fromTime: 1_700_000_000,
-      toTime: 1_700_000_899,
+      fromTime: Math.min(...times),
+      toTime: Math.max(...times),
       stepTicks: 5,
       settlementToleranceSeconds: 10,
       flatEpsilon: 0,
-      proposalAmount: 10,
-      proposalCurrency: "USD",
-      proposalBasis: "stake",
+      economics: cliEconomics(),
       codeVersion: "wp03-cli-1",
       datasetHash: dataset.datasetHash,
       featureVersion: "sfg-1",

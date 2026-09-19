@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { fitCalibration, calibrateScore } from "./calibration.js";
-import { computeMetrics, wilson, meanCi } from "./metrics.js";
+import { computeMetrics, stressedExpectancy, wilson, meanCi } from "./metrics.js";
 import { orderSignals, simulate, SIMULATOR_POLICY_VERSION } from "./simulator.js";
 import { emptyLedger, verdictFor } from "./lab.js";
 import type { SettledDecision } from "./replay.js";
@@ -11,12 +11,15 @@ function decision(overrides: Partial<SettledDecision> = {}): SettledDecision {
     time: 1_700_000_000,
     signal: "SIGNAL_CALL",
     strategyId: "s",
+    runnerId: "test_60s",
     instrument: "SYNTH",
     expirySeconds: 60,
     presetVersion: "seed-1",
     featureHash: "h",
     quality: 0.6,
     proposalKey: null,
+    proposalReceivedAt: null,
+    proposalAgeMs: null,
     effectivePayout: 0.9,
     breakEven: 10 / 19,
     reason: "test",
@@ -87,6 +90,21 @@ describe("metrics honesty", () => {
     expect(high).toBeGreaterThan(0.6);
     expect(meanCi([1])).toBeNull();
     expect(meanCi([1, 2, 3])).not.toBeNull();
+  });
+
+  it("haircut stress degrades wins and never invents evidence", () => {
+    const decisions = [
+      decision({ label: "UP", realized: 0.9, effectivePayout: 0.9 }),
+      decision({ label: "DOWN", realized: -1, effectivePayout: 0.9 }),
+    ];
+    // Zero haircut reproduces the monetary mean: (0.9 - 1) / 2.
+    expect(stressedExpectancy(decisions, 0)).toBeCloseTo(-0.05, 12);
+    // 20% haircut: (0.72 - 1) / 2.
+    expect(stressedExpectancy(decisions, 0.2)).toBeCloseTo(-0.14, 12);
+    expect(stressedExpectancy([decision({ label: "UNKNOWN", realized: null, points: null })], 0.2)).toBeNull();
+    expect(
+      stressedExpectancy([decision({ realized: null, points: 1, effectivePayout: null })], 0.2),
+    ).toBeNull();
   });
 });
 

@@ -40,7 +40,7 @@ export class NoSignalStrategyEngine implements StrategyEngine {
 export { FEATURE_VERSION, SharedFeatureGraph, computeFeatures, hashSnapshot } from "./features.js";
 export type { FeatureSnapshot, FeatureOptions } from "./features.js";
 export type { StrategyInput, StrategyOutput, QuantitativeEngine } from "./engine.js";
-export { noSignal } from "./engine.js";
+export { noSignal, preflight, PREFLIGHT_MIN_BARS } from "./engine.js";
 export { evaluateEdge } from "./edge.js";
 export type { EdgeInput, EdgeResult, EdgeVerdict } from "./edge.js";
 export { decideTrendPulse, STRATEGY_ID as TREND_PULSE_ID, STRATEGY_VERSION as TREND_PULSE_VERSION } from "./trend-pulse.js";
@@ -65,6 +65,7 @@ export {
   SEED_PRESET_VERSION,
   STRATEGY_FAMILIES,
   gridVariants,
+  presetHash,
   searchSpace,
   seedPreset,
 } from "./presets.js";

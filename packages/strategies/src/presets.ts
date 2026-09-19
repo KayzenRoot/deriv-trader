@@ -4,6 +4,7 @@
  * Search neighborhoods are bounded with a per-run variant budget; every
  * attempted variant is recorded in the research ledger (research package).
  */
+import { createHash } from "node:crypto";
 import type { ExpirySeconds } from "@deriv-trader/domain";
 import { presetSchema as trendPulseSchema } from "./trend-pulse.js";
 import { presetSchema as meanSnapbackSchema } from "./mean-snapback.js";
@@ -12,6 +13,10 @@ import { presetSchema as anchorPullbackSchema } from "./anchor-pullback.js";
 import { presetSchema as microPressureSchema } from "./micro-pressure.js";
 
 export const SEED_PRESET_VERSION = "seed-1";
+/**
+ * Strict total attempted-variant budget per run, seed included.
+ * gridVariants() never returns more than this many presets total.
+ */
 export const MAX_VARIANTS_PER_RUN = 12;
 
 export type StrategyFamilyId =
@@ -40,19 +45,39 @@ export const ALL_PROFILES: RunnerProfileId[] = STRATEGY_FAMILIES.flatMap((strate
   EXPIRIES.map((expirySeconds) => ({ strategy, expirySeconds })),
 );
 
-export function seedPreset(strategy: StrategyFamilyId): Record<string, number | string> {
-  switch (strategy) {
+export function seedPreset(profile: RunnerProfileId): {
+  readonly preset: Record<string, number | string>;
+  readonly version: string;
+  readonly hash: string;
+} {
+  let preset: Record<string, number | string>;
+  switch (profile.strategy) {
     case "trend_pulse":
-      return trendPulseSchema.parse({});
+      preset = trendPulseSchema.parse({});
+      break;
     case "mean_snapback":
-      return meanSnapbackSchema.parse({});
+      preset = meanSnapbackSchema.parse({});
+      break;
     case "breakout_surge":
-      return breakoutSurgeSchema.parse({});
+      preset = breakoutSurgeSchema.parse({});
+      break;
     case "anchor_pullback":
-      return anchorPullbackSchema.parse({});
+      preset = anchorPullbackSchema.parse({});
+      break;
     case "micro_pressure":
-      return microPressureSchema.parse({});
+      preset = microPressureSchema.parse({});
+      break;
   }
+  const version = `${SEED_PRESET_VERSION}+${profile.strategy}+${String(profile.expirySeconds)}s`;
+  const canonical = Object.keys(preset)
+    .sort()
+    .map((key) => `${key}=${String(preset[key])}`)
+    .join(",");
+  return {
+    preset,
+    version,
+    hash: createHash("sha256").update(`${version}|${canonical}`, "utf8").digest("hex"),
+  };
 }
 
 export interface SearchDimension {
@@ -93,7 +118,16 @@ export function searchSpace(strategy: StrategyFamilyId): SearchDimension[] {
   }
 }
 
-/** Deterministic grid variants, capped at the per-run budget. */
+/** Stable hash for any preset record (expiry-specific via caller versioning). */
+export function presetHash(preset: Record<string, number | string>): string {
+  const canonical = Object.keys(preset)
+    .sort()
+    .map((key) => `${key}=${String(preset[key])}`)
+    .join(",");
+  return createHash("sha256").update(canonical, "utf8").digest("hex");
+}
+
+/** Deterministic grid variants: at most MAX_VARIANTS_PER_RUN TOTAL attempts. */
 export function gridVariants(
   seed: Record<string, number | string>,
   space: SearchDimension[],
@@ -106,12 +140,12 @@ export function gridVariants(
       const current = variants[i];
       if (!current) continue;
       for (let value = dim.min; value <= dim.max + 1e-12; value += dim.step) {
-        if (variants.length >= budget + 1) break outer;
+        if (variants.length >= budget) break outer;
         const rounded = Math.round(value * 1e6) / 1e6;
         if ((current[dim.param] as number) === rounded) continue;
         variants.push({ ...current, [dim.param]: rounded });
       }
     }
   }
-  return variants.slice(0, budget + 1);
+  return variants.slice(0, budget);
 }

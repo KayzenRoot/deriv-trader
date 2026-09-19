@@ -5,16 +5,17 @@
  */
 import { z } from "zod";
 import type { StrategyInput, StrategyOutput } from "./engine.js";
-import { noSignal, pBeOf } from "./engine.js";
+import { noSignal, pBeOf, preflight } from "./engine.js";
 
 export const STRATEGY_ID = "breakout_surge";
 export const STRATEGY_VERSION = "1.0.0";
 
 export const presetSchema = z.object({
-  maxCompression: z.number().positive().default(2.5),
+  maxCompression: z.number().positive().default(0.7),
   minExpansionRatio: z.number().min(1).default(1.4),
   minBreakoutDistance: z.number().positive().default(0.15),
   minHoldPersistence: z.number().min(0).max(1).default(0.4),
+  /** Reserved spike-multiple cap; giant isolated spikes are rejected via the anomaly filter. */
   maxSpikeMultiple: z.number().positive().default(4),
 });
 
@@ -24,6 +25,8 @@ export function decideBreakoutSurge(
   input: StrategyInput,
   preset: BreakoutSurgePreset,
 ): StrategyOutput {
+  const blocked = preflight(input);
+  if (blocked) return blocked;
   const v = input.features.values;
   if (input.features.anomaly) return noSignal(input, "SPIKE_FILTER", "giant isolated spike rejected");
   if ((v["compression_50"] ?? Number.POSITIVE_INFINITY) > preset.maxCompression) {
@@ -37,8 +40,9 @@ export function decideBreakoutSurge(
   if (distance < preset.minBreakoutDistance) {
     return noSignal(input, "WEAK_BREAKOUT", "breakout distance too small");
   }
-  if (distance > preset.maxSpikeMultiple * preset.minBreakoutDistance) {
-    return noSignal(input, "MATURE_MOVE", "move too extended to chase");
+  const expansion = v["expansion_ratio"] ?? 0;
+  if (expansion < 1.05 && distance > 0.5) {
+    return noSignal(input, "MATURE_MOVE", "extension matured, expansion faded");
   }
   const direction = position > 0.5 ? 1 : -1;
   const hold = (v["persistence_20"] ?? 0) * direction;

@@ -44,6 +44,31 @@ export function meanCi(values: number[], z = 1.96): [number, number] | null {
   return [mean - half, mean + half];
 }
 
+/**
+ * Payout-haircut stress (research robustness probe, not a prediction).
+ * Recomputes per-stake expectancy as if every win paid (1 - haircut) less:
+ * realized' = won ? effectivePayout * (1 - haircut) : -1. FLAT/UNKNOWN
+ * contribute 0. Null when no monetary evidence exists.
+ */
+export function stressedExpectancy(
+  decisions: readonly SettledDecision[],
+  haircut: number,
+): number | null {
+  const stressed: number[] = [];
+  for (const decision of decisions) {
+    if (decision.signal === "NO_SIGNAL" || decision.label === "UNKNOWN" || decision.label === "FLAT") {
+      continue;
+    }
+    if (decision.effectivePayout === null) continue;
+    const won =
+      (decision.signal === "SIGNAL_CALL" && decision.label === "UP") ||
+      (decision.signal === "SIGNAL_PUT" && decision.label === "DOWN");
+    stressed.push(won ? decision.effectivePayout * (1 - haircut) : -1);
+  }
+  if (stressed.length === 0) return null;
+  return stressed.reduce((a, b) => a + b, 0) / stressed.length;
+}
+
 export function computeMetrics(
   decisions: readonly SettledDecision[],
   payouts: readonly (number | null)[],
