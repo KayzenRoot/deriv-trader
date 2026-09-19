@@ -32,3 +32,51 @@ export function summarizeDataset(rows: readonly { symbol: string }[]): {
   const symbols = [...new Set(rows.map((r) => r.symbol))].sort();
   return { name: "foundation", rows: rows.length, symbols };
 }
+export { mulberry32, generateTicks, generateProposals } from "./dataset.js";
+export type { SyntheticRegime, SyntheticSpec, SyntheticProposalSpec } from "./dataset.js";
+export {
+  overlaps,
+  chronologicalSplit,
+  foldOf,
+  FinalTestLock,
+} from "./splits.js";
+export type { TimeRange, ChronologicalSplit, FoldName } from "./splits.js";
+export { joinProposal, settle, runReplay } from "./replay.js";
+export type {
+  ReplayMode,
+  OutcomeLabel,
+  ReplayDecision,
+  SettledDecision,
+  ReplayManifest,
+  ReplayRunner,
+  ReplayInput,
+  ReplayOutput,
+} from "./replay.js";
+export { fitCalibration, calibrateScore } from "./calibration.js";
+export type {
+  CalibrationSample,
+  CalibrationResult,
+  CalibrationOptions,
+  ReliabilityBucket,
+} from "./calibration.js";
+export { wilson, meanCi, computeMetrics } from "./metrics.js";
+export type { ProfileMetrics } from "./metrics.js";
+export {
+  makeEngine,
+  toReplayRunner,
+  verdictFor,
+  runLab,
+  emptyLedger,
+} from "./lab.js";
+export type {
+  EvidenceGrade,
+  LabDataset,
+  LabOptions,
+  LabRun,
+  ProfileState,
+  ProfileVerdict,
+  ResearchLedger,
+  VariantAttempt,
+} from "./lab.js";
+export { orderSignals, simulate, toSimulatorSignals, SIMULATOR_POLICY_VERSION } from "./simulator.js";
+export type { SimulatorPolicy, SimulatorSignal, SimulatorFill, SimulatorMetrics } from "./simulator.js";
