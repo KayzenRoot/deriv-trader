@@ -79,11 +79,12 @@ CLI `matrix --seed 42` (also covered in-process by tests): all 15 profiles `RETE
 
 ## 14. Test counts + CI run IDs
 
-- Local: 26 files / 123 tests green, stable across repeats
-- Final head `5a70588` (PR #7 https://github.com/KayzenRoot/deriv-trader/pull/7):
-  product push run `35417447361` SUCCESS; product PR run `35417449775` SUCCESS;
-  governance PR run `35417449779` SUCCESS (all 2026-09-19 on
+- Local: 26 files / 123 tests green, stable across repeats (lint/typecheck/build/audit/dep-boundaries/cycles clean; `git diff --check` clean)
+- CORRECTION-001 head `d91fed0` (PR #7 https://github.com/KayzenRoot/deriv-trader/pull/7):
+  product push run `35420975834` SUCCESS; product PR run `35420977207` SUCCESS;
+  governance PR run `35420977155` SUCCESS (all 2026-09-19 on
   `work/DT-WP-03-QUANT-STRATEGY`)
+- Superseded pre-correction head `5a70588`: push `35417447361`, PR `35417449775`, governance `35417449779` (all SUCCESS, retained for history)
 - If this file was updated after those runs to record their IDs, that update is
   an evidence-only commit; CI re-runs on the new tip and its run IDs are
   confirmed SUCCESS before stopping (see final executor report)
