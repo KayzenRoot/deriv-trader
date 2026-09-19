@@ -31,7 +31,7 @@ Covers:
 No buy/sell/live-money implementation.
 
 ## WP-03 — Quant & Strategy Engine Module
-Status: READY
+Status: READY_FOR_EXECUTION
 
 Quant Lab, replay/backtester, Shared Feature Graph, Edge Gate, five strategy families, 1m/3m/5m Runner profiles, validation pipeline and research evidence.
 
