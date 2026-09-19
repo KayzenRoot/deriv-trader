@@ -1,7 +1,7 @@
 # V1 Development Work-Package Roadmap
 
 Status: ACTIVE
-Base checkpoint: DT-CP-0005
+Base checkpoint: DT-CP-0006
 
 The implementation plan is intentionally consolidated into large coherent Work Packages to reduce prompt count and repeated context.
 
@@ -10,7 +10,7 @@ Status: APPROVED / MERGED
 Covers repository bootstrap, monorepo, stack, CI, worker/web skeleton, package boundaries and developer foundation.
 
 ## WP-02 — Deriv Data & Scanner Module
-Status: READY
+Status: APPROVED / MERGED
 Covers:
 - current Deriv Options public API adapter;
 - connection supervisor;
@@ -31,7 +31,8 @@ Covers:
 No buy/sell/live-money implementation.
 
 ## WP-03 — Quant & Strategy Engine Module
-Planned:
+Status: READY
+
 Quant Lab, replay/backtester, Shared Feature Graph, Edge Gate, five strategy families, 1m/3m/5m Runner profiles, validation pipeline and research evidence.
 
 ## WP-04 — Risk & Demo Execution Module

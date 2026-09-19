@@ -1,7 +1,8 @@
 # Work Order DT-WP-02 — DERIV DATA & SCANNER MODULE
 
-STATUS: READY_FOR_EXECUTION
+STATUS: APPROVED / CLOSED
 BASE CHECKPOINT: DT-CP-0005
+PROMOTED CHECKPOINT: DT-CP-0006
 RISK: HIGH_ASSURANCE
 HISTORICAL BACKLOG COVERAGE: DT-API-0001 + DT-DATA-0001 + DT-SCANNER-0001
 
@@ -351,6 +352,4 @@ Record:
 APPROVED / CORRECTION_REQUIRED / BLOCKED
 
 ## STOP CONDITION
-Stop only when the entire read-only Deriv/Data/Scanner module is implemented, deterministic CI is green, local/fixture data evidence is reproducible, bounded public API smoke has either passed or is explicitly BLOCKED by external availability with deterministic contract evidence intact, no buy/sell/live-money path exists, and no unresolved CRITICAL/HIGH defect remains.
-
-Open the governed PR and leave it unmerged for ChatGPT exact-head review.
+SATISFIED by exact-head review ec9b85c87b10da053c5322fcc83183cea63a1a1b, green product/governance PR workflows, squash merge PR #6 and DT-CP-0006 promotion.

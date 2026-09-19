@@ -1,66 +1,72 @@
 # DT Checkpoint
-Checkpoint: DT-CP-0005
+Checkpoint: DT-CP-0006
 Date: 2026-09-18
 Mode: GREENFIELD
 Risk: HIGH_ASSURANCE
 GEF baseline: V1.0.0 governance model
-State: FOUNDATION_ACCEPTED_READY_FOR_DERIV_DATA_SCANNER
+State: DERIV_DATA_SCANNER_ACCEPTED_READY_FOR_QUANT_STRATEGY
 
 ## Accepted evidence
 - DT-CP-0001 bootstrap accepted.
 - DT-CP-0002 discovery accepted.
 - DT-CP-0003 local preflight/planning-ready accepted.
 - DT-CP-0004 planning baseline accepted.
-- DT-WP-01 / DT-DEV-BOOTSTRAP-0001 PR #5 exact audited head: d154126277ea4b58e750eb67d088a7a97d352559.
-- Product workflow PR run #8: SUCCESS.
-- Governance workflow PR run #18: SUCCESS.
-- Exact-head COMMENT review id: 5252676948.
-- Squash merge SHA: 9003ed5b9b70b234b5c1a2372679a6fb17ce81a7.
-- Final compare before merge: 5 commits ahead, 0 behind; 98 changed files; 0 deletions.
-- CRITICAL/HIGH unresolved Foundation findings: 0.
+- DT-CP-0005 Foundation Module accepted.
+- DT-WP-02 / PR #6 exact audited head: ec9b85c87b10da053c5322fcc83183cea63a1a1b.
+- Product PR workflow run #23: SUCCESS.
+- Governance PR workflow run #27: SUCCESS.
+- Exact-head COMMENT review id: 5254079552.
+- Squash merge SHA: d520fa713b3855228b7a8c488c095655eb8162d0.
+- Final compare before merge: 6 commits ahead, 0 behind; 62 changed files; 0 deletions.
+- Unresolved CRITICAL/HIGH WP-02 findings: 0.
 
-## Foundation accepted
-- npm-workspaces TypeScript monorepo.
-- Node 24 LTS / npm 11.x engine policy.
-- Next.js 16.3.x Active LTS/security line reconciled.
-- React 19.2.x, Tailwind 4.3.x, Motion 13.x, ECharts 6.1.x.
-- Fastify trader worker, loopback-only by default.
-- Supabase/Auth/DB/SecretStore skeleton boundaries.
-- Domain/events/config/testing foundations.
-- All planned package boundaries scaffolded.
-- Explicit package dependency allowlist + negative self-tests.
-- Cycle check.
-- Cross-platform .gitattributes/.editorconfig EOL policy.
-- Clean typed lint on Ubuntu without prebuilt dist artifacts.
-- Unit tests/builds/web production build/trader health smoke.
-- npm audit high-severity gate green.
-- Product + governance CI green.
-- Current Deriv Options API REST/public-WS endpoints represented in config only, with no live network/trading implementation.
-- No broker economic path.
-- No real credentials.
-- No live-money execution.
+## Deriv/Data/Scanner accepted
+- Current Deriv Options public WebSocket adapter.
+- req_id correlation and shared public transport.
+- connection supervisor, heartbeat, bounded reconnect and exactly-once restoration.
+- current active_symbols/contracts_for/ticks/ticks_history/proposal normalization.
+- current public error mapping and Schema Drift Guard.
+- API Budget Manager with per-group backoff, execution reserve and configurable current limits.
+- Symbol & Contract Registry with direction-specific expiry proof.
+- one external tick stream per unique symbol with internal fan-out.
+- direction-specific Opportunity Lattice.
+- Payout Pulse Scheduler and actual proposal economics.
+- effective payout + break-even math.
+- authoritative Market Freshness Matrix over registry/capability/tick/proposal/connection/skew/trust.
+- Eligibility Engine fail-closed on stale/unknown/untrusted data.
+- explicit bounded continuous read-only scanner lifecycle.
+- prospective tick/proposal capture.
+- local Parquet + DuckDB research plane.
+- tick partitions by date+symbol.
+- proposal partitions by date+symbol+expiry.
+- Dataset Passport.
+- Data Quality Gate.
+- incomplete-file recovery, disk-pressure handling and content-based compaction verification.
+- bounded credential-free public Deriv smoke passed.
+- deterministic CI remains offline.
+- no buy/sell/account/live-money implementation.
 
 ## Architecture invariants retained
 - LOCAL-FIRST / FREE-FIRST / modular-monolith-first.
-- Web remains presentation/client boundary and cannot import worker economic/service modules directly.
-- Trader Worker remains trading authority boundary.
-- Strategies cannot execute broker orders.
-- Risk remains mandatory and centralized.
-- Research has no economic authority.
+- scanner eligibility is not strategy direction logic.
+- web cannot import worker service internals directly.
+- Trader Worker remains future economic authority boundary.
+- strategies cannot execute broker orders.
+- research has no economic authority.
 - Git remains canonical over Hive.
 
 ## Still unproven
-- Real Deriv runtime adapter behavior.
-- Active-symbol/contracts/tick/proposal normalization against current API.
-- API budget behavior under load.
-- Prospective tick/proposal capture.
-- Parquet/DuckDB runtime pipeline.
-- Scanner/Payout Pulse/Market Freshness operation.
-- Any strategy edge/profitability.
+- Strategy engine correctness/edge.
+- Shared Feature Graph behavior.
+- Deterministic replay/backtest across acceptance datasets.
+- Walk-forward/OOS/prospective validation of any strategy-expiry profile.
+- Portfolio/multi-Runner simulation.
+- Risk Engine.
 - Demo execution/reconciliation.
+- Any profitability claim.
 - Live-money execution.
 
 ## Next legal increment
-DT-WP-02 — DERIV DATA & SCANNER MODULE.
+DT-WP-03 — QUANT & STRATEGY ENGINE MODULE.
 
 Live-money remains blocked.
