@@ -449,49 +449,47 @@ describe("assembled MarketScannerRuntime", () => {
 
 describe("continuous read-only lifecycle (R7)", () => {
   it("runs bounded cycles on timers without overlap and pauses cleanly", async () => {
-    const { vi } = await import("vitest");
-    vi.useFakeTimers();
-    try {
-      const clock = makeClock();
-      const fixture = fixtureTransport(["frxEURUSD"]);
-      const runtime = new MarketScannerRuntime({
-        config: testConfig(),
-        source: fixture.source,
-        clock,
-        captureRoot: mkdtempSync(join(tmpdir(), "dt-loop-")),
+    const clock = makeClock();
+    const fixture = fixtureTransport(["frxEURUSD"]);
+    const runtime = new MarketScannerRuntime({
+      config: testConfig(),
+      source: fixture.source,
+      clock,
+      captureRoot: mkdtempSync(join(tmpdir(), "dt-loop-")),
+    });
+    // Constructing starts nothing: no timers, no sends.
+    expect(runtime.loopState()).toMatchObject({ lifecycle: "idle", timers: 0 });
+    expect(fixture.sends()).toBe(0);
+    await runtime.connect();
+    // Short real intervals: fake timers fight real async I/O (DuckDB/statfs),
+    // so poll to the condition with a hard cap instead.
+    runtime.startReadOnlyScanner({ universeMs: 50, pulseMs: 50, captureMs: 50 });
+    expect(runtime.loopState().timers).toBe(3);
+    const sleep = (ms: number): Promise<void> =>
+      new Promise((resolve) => {
+        setTimeout(resolve, ms);
       });
-      // Constructing starts nothing: no timers, no sends.
-      expect(runtime.loopState()).toMatchObject({ lifecycle: "idle", timers: 0 });
-      expect(fixture.sends()).toBe(0);
-      await runtime.connect();
-      runtime.startReadOnlyScanner({ universeMs: 1000, pulseMs: 1000, captureMs: 1000 });
-      expect(runtime.loopState().timers).toBe(3);
-      // Periodic repetition: poll to the condition with a hard cap instead of
-      // asserting exact cadence (cycle latency varies; skips are by design).
-      for (let i = 0; i < 20; i += 1) {
-        const current = runtime.loopState().counters;
-        if (current.universe >= 2 && current.pulse >= 2 && current.capture >= 2) break;
-        await vi.advanceTimersByTimeAsync(500);
-      }
-      const counters = runtime.loopState().counters;
-      expect(counters.universe).toBeGreaterThanOrEqual(2);
-      // The continuous lifecycle itself must prove capabilities; no manual
-      // probeExpiries() call is required after start.
-      expect(runtime.registry.isProven("frxEURUSD", "CALL", 60)).toBe(true);
-      expect(runtime.registry.isProven("frxEURUSD", "PUT", 60)).toBe(true);
-      expect(counters.pulse).toBeGreaterThanOrEqual(2);
-      expect(counters.capture).toBeGreaterThanOrEqual(2);
-      expect(runtime.loopState().maxConcurrentCycles).toBeLessThanOrEqual(1);
-      runtime.pauseReadOnlyScanner();
-      expect(runtime.loopState()).toMatchObject({ timers: 0 });
-      expect(runtime.loopState().lifecycle).toBe("paused");
-      expect(runtime.statusData().capture).toBe("idle");
-      const frozen = { ...runtime.loopState().counters };
-      await vi.advanceTimersByTimeAsync(5000);
-      expect(runtime.loopState().counters).toEqual(frozen);
-      await runtime.stop();
-    } finally {
-      vi.useRealTimers();
+    for (let i = 0; i < 100; i += 1) {
+      const current = runtime.loopState().counters;
+      if (current.universe >= 2 && current.pulse >= 2 && current.capture >= 2) break;
+      await sleep(100);
     }
-  });
+    const counters = runtime.loopState().counters;
+    expect(counters.universe).toBeGreaterThanOrEqual(2);
+    // The continuous lifecycle itself must prove capabilities; no manual
+    // probeExpiries() call is required after start.
+    expect(runtime.registry.isProven("frxEURUSD", "CALL", 60)).toBe(true);
+    expect(runtime.registry.isProven("frxEURUSD", "PUT", 60)).toBe(true);
+    expect(counters.pulse).toBeGreaterThanOrEqual(2);
+    expect(counters.capture).toBeGreaterThanOrEqual(2);
+    expect(runtime.loopState().maxConcurrentCycles).toBeLessThanOrEqual(1);
+    runtime.pauseReadOnlyScanner();
+    expect(runtime.loopState()).toMatchObject({ timers: 0 });
+    expect(runtime.loopState().lifecycle).toBe("paused");
+    expect(runtime.statusData().capture).toBe("idle");
+    const frozen = { ...runtime.loopState().counters };
+    await sleep(300);
+    expect(runtime.loopState().counters).toEqual(frozen);
+    await runtime.stop();
+  }, 60000);
 });

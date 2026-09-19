@@ -79,8 +79,9 @@ CLI `matrix --seed 42` (also covered in-process by tests): all 15 profiles `RETE
 
 ## 14. Test counts + CI run IDs
 
-- Local: 26 files / 120 tests green (was 21/89)
+- Local: 26 files / 120 tests green, stable across repeats
 - Product/governance CI run IDs on final head: recorded in the final executor report after push; both must be SUCCESS before stopping
+- CI failure analyzed and fixed during execution: push run `35416922434` failed the R7 lifecycle test on the slower runner (one shared overlap flag let a slow capture starve universe/pulse ticks). Fixed with per-task overlap guards plus skip accounting and per-task concurrency proof; the test uses short real intervals with poll-to-condition instead of fake timers fighting real async I/O. Re-verified locally (3× green) before push.
 
 ## 15. Exact profile verdicts
 
