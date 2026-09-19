@@ -126,11 +126,12 @@ export class MarketScannerRuntime {
   private duckdb: { instance: DuckDBInstance; connection: DuckDBConnection } | null = null;
   private lifecycle: RuntimeLifecycle = "idle";
   private loopTimers: ReturnType<typeof setInterval>[] = [];
-  private loopRunning = false;
+  /** Per-task overlap guards: a slow capture must never starve pulse/universe. */
+  private readonly loopBusy = { universe: false, pulse: false, capture: false };
   private readonly loopCounters = { universe: 0, pulse: 0, capture: 0 };
+  private readonly activePerTask = { universe: 0, pulse: 0, capture: 0 };
+  private readonly maxPerTask = { universe: 0, pulse: 0, capture: 0 };
   private skippedCycles = 0;
-  private maxConcurrentCycles = 0;
-  private activeCycles = 0;
 
   constructor(options: RuntimeOptions) {
     this.config = options.config;
@@ -233,37 +234,41 @@ export class MarketScannerRuntime {
     const universeMs = options.universeMs ?? this.config.scannerLoopUniverseMs;
     const pulseMs = options.pulseMs ?? this.config.scannerLoopPulseMs;
     const captureMs = options.captureMs ?? this.config.captureRollMs;
-    const every = (ms: number, task: () => Promise<void>): void => {
+    const every = (
+      key: keyof typeof this.loopBusy,
+      ms: number,
+      task: () => Promise<void>,
+    ): void => {
       const timer = setInterval(() => {
         if (this.lifecycle !== "running") return;
-        if (this.loopRunning) {
+        if (this.loopBusy[key]) {
           this.skippedCycles += 1;
           return;
         }
-        this.loopRunning = true;
-        this.activeCycles += 1;
-        this.maxConcurrentCycles = Math.max(this.maxConcurrentCycles, this.activeCycles);
+        this.loopBusy[key] = true;
+        this.activePerTask[key] += 1;
+        this.maxPerTask[key] = Math.max(this.maxPerTask[key], this.activePerTask[key]);
         void task()
           .catch(() => undefined)
           .finally(() => {
-            this.activeCycles -= 1;
-            this.loopRunning = false;
+            this.activePerTask[key] -= 1;
+            this.loopBusy[key] = false;
           });
       }, ms);
       const unref = timer as unknown as { unref?: () => void };
       unref.unref?.();
       this.loopTimers.push(timer);
     };
-    every(universeMs, async () => {
+    every("universe", universeMs, async () => {
       this.loopCounters.universe += 1;
       await this.refreshUniverse();
       await this.ensureTicks();
     });
-    every(pulseMs, async () => {
+    every("pulse", pulseMs, async () => {
       this.loopCounters.pulse += 1;
       await this.scannerCycle();
     });
-    every(captureMs, async () => {
+    every("capture", captureMs, async () => {
       this.loopCounters.capture += 1;
       await this.captureCycle();
     });
@@ -280,6 +285,7 @@ export class MarketScannerRuntime {
     readonly lifecycle: RuntimeLifecycle;
     readonly timers: number;
     readonly counters: { readonly universe: number; readonly pulse: number; readonly capture: number };
+    /** Highest same-task concurrency observed (must stay 1: no overlapping runs). */
     readonly maxConcurrentCycles: number;
     readonly skippedCycles: number;
   } {
@@ -287,7 +293,11 @@ export class MarketScannerRuntime {
       lifecycle: this.lifecycle,
       timers: this.loopTimers.length,
       counters: { ...this.loopCounters },
-      maxConcurrentCycles: this.maxConcurrentCycles,
+      maxConcurrentCycles: Math.max(
+        this.maxPerTask.universe,
+        this.maxPerTask.pulse,
+        this.maxPerTask.capture,
+      ),
       skippedCycles: this.skippedCycles,
     };
   }

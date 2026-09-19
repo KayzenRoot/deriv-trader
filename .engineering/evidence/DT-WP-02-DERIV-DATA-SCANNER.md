@@ -167,6 +167,19 @@ no explicit continuous lifecycle.
 - Final head SHA, changed files vs `84353c3`, and CI run IDs: recorded in the
   final executor report after push
 
+### CORRECTION 002 follow-up: shared loop guard starvation (found by CI)
+
+- Push run `35412860556` (product, head `ff3381b`) FAILED in 25s on the R7
+  lifecycle test (`expected 1 to be >= 2`): one shared overlap flag let a slow
+  capture cycle starve universe/pulse ticks on the slower runner. Local runs
+  passed because cycles settle faster than the poll steps there.
+- Root cause is a production design flaw, not a test artifact: a single guard
+  across heterogeneous loops couples scanner cadence to capture latency.
+- Fix: per-task overlap guards (`universe`/`pulse`/`capture` busy flags with a
+  skip counter) plus per-task max-concurrency observability in `loopState()`;
+  the test now asserts repetition with poll-to-condition and same-task
+  non-overlap. Re-verified locally (3× green) before push.
+
 ## 13. Known warnings/deviations
 
 - `sharp` allow-scripts install notice (Next toolchain, standard, no action)
