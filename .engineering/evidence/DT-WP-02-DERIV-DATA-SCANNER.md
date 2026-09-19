@@ -119,6 +119,54 @@ Fixture dataset: zero findings (clean). Adversarial unit rows: duplicates→WARN
   executor report). `git diff` between the validated head and the evidence-tip
   shows evidence markdown only.
 
+---
+
+## CORRECTION 002 (review head `84353c3`, PR #6)
+
+Root causes: direction-blind candidate identity (snapshots per direction but
+one row per symbol+expiry); symbol-level proof shared across directions;
+snapshot fields recorded but not gating eligibility; capture liveness derived
+from a stale boolean; global backoff escalation; date-only capture partitions;
+no explicit continuous lifecycle.
+
+- R1: `Opportunity` now carries `direction`, `proposalKey`, `proposalId`,
+  `breakEven` alongside payout/freshness/eligibility/blocker; `buildOpportunity`
+  takes the direction; lattice serializes one row per symbol+direction+expiry
+- R2: registry `provenExpiries` entries carry per-expiry `directions[]` with
+  `proveExpiry(symbol, expiry, direction)` / `isProven(...)`; runtime revoke
+  sets are per direction; probes, pulse candidates, snapshots and lattice all
+  iterate proven directions only; lattice `contractAvailable` uses the exact
+  direction; asymmetric tests prove CALL⇏PUT, PUT⇏CALL, per-direction revoke
+- R3: `FreshnessPolicy` (registry/capability TTLs, skew tolerance, all
+  env-configurable) feeds `summarizeFreshness`, which now emits
+  `registryStale`/`capabilityStale`/`skewSuspect` authority flags;
+  `eligibilityFromSnapshot` consumes them directly (stale authority or suspect
+  skew → `UNKNOWN_FAIL_CLOSED`); tests prove fresh-tick + stale-capability /
+  stale-registry / stale-proposal / suspect-skew all stay non-ELIGIBLE
+- R4: explicit `RuntimeLifecycle` (idle/running/paused/stopped); capture reads
+  live only when running with a live stream and no disk stop; stop and
+  disconnect report idle; buffers/finalized counts stay truthful
+- R5: backoff level tracked per proposal/other/rest group;
+  `recordSuccess(group)` clears only that group; test proves cross-group
+  success never weakens another group's episode; reserve behavior unchanged
+- R6: finalization groups ticks by symbol and proposals by symbol+expiry into
+  `ticks/date=/symbol=/` and `proposals/date=/symbol=/expiry_s=/` partitions;
+  Passport lists every file; integration test proves pruning/readback across
+  two symbols and two expiries
+- R7: `startReadOnlyScanner()` runs bounded universe/pulse/capture intervals
+  with a shared overlap guard (skips counted), `pauseReadOnlyScanner()` clears
+  timers, `stop()` ends the lifecycle; nothing auto-starts on construct or GET;
+  deterministic fake-timer tests prove repetition, no-overlap and clean pause
+- Live binary-frame decoding fix carried over and covered by regression test
+- Assembled runtime smoke PASS 2026-09-19 — 89-symbol universe, 6/6 probes
+  proven, 2 ticks, 6-candidate direction-identified lattice all ELIGIBLE near
+  0.95 payout, 13 bounded sends; plain public smoke PASS alongside
+- Deriv docs re-checked at correction start (limits unchanged)
+- Final tests: 21 files / 89 tests green (stable across repeats after
+  de-flaking the cadence test into poll-to-condition)
+- Final head SHA, changed files vs `84353c3`, and CI run IDs: recorded in the
+  final executor report after push
+
 ## 13. Known warnings/deviations
 
 - `sharp` allow-scripts install notice (Next toolchain, standard, no action)

@@ -11,6 +11,22 @@ import type { FreshnessState } from "./ticks.js";
 export type ContinuityState = "continuous" | "gapped" | "invalidated" | "none";
 export type SkewState = "ok" | "suspect" | "unknown";
 
+/**
+ * Operational TTL/tolerance policy (R3). Defaults are runtime tuning, not
+ * trading-edge assumptions; all values are configurable via AppConfig.
+ */
+export interface FreshnessPolicy {
+  readonly registryTtlMs: number;
+  readonly capabilityTtlMs: number;
+  readonly skewToleranceSeconds: number;
+}
+
+export const DEFAULT_FRESHNESS_POLICY: FreshnessPolicy = {
+  registryTtlMs: 30 * 60_000,
+  capabilityTtlMs: 15 * 60_000,
+  skewToleranceSeconds: 60,
+};
+
 export interface FreshnessSnapshot {
   readonly underlyingSymbol: string;
   readonly direction: "CALL" | "PUT";
@@ -29,6 +45,10 @@ export interface FreshnessSnapshot {
   readonly skewSeconds: number | null;
   readonly skewState: SkewState;
   readonly trusted: boolean;
+  /** Authority flags consumed directly by eligibility (fail closed). */
+  readonly registryStale: boolean;
+  readonly capabilityStale: boolean;
+  readonly skewSuspect: boolean;
   /** Assembled authority: the single freshness verdict for this candidate. */
   readonly overall: FreshnessState;
 }
@@ -53,9 +73,10 @@ export interface SnapshotInput {
   readonly trusted: boolean;
 }
 
-const SKEW_SUSPECT_SECONDS = 60;
-
-export function summarizeFreshness(input: SnapshotInput): FreshnessSnapshot {
+export function summarizeFreshness(
+  input: SnapshotInput,
+  policy: FreshnessPolicy = DEFAULT_FRESHNESS_POLICY,
+): FreshnessSnapshot {
   const continuity: ContinuityState = input.invalidated
     ? "invalidated"
     : input.gapped
@@ -63,12 +84,12 @@ export function summarizeFreshness(input: SnapshotInput): FreshnessSnapshot {
       : input.tickAgeMs === null
         ? "none"
         : "continuous";
-  const skewState: SkewState =
-    input.skewSeconds === null
-      ? "unknown"
-      : input.skewSeconds > SKEW_SUSPECT_SECONDS
-        ? "suspect"
-        : "ok";
+  const skewSuspect =
+    input.skewSeconds !== null && input.skewSeconds > policy.skewToleranceSeconds;
+  const skewState: SkewState = input.skewSeconds === null ? "unknown" : skewSuspect ? "suspect" : "ok";
+  const registryStale = input.registryAgeMs === null || input.registryAgeMs > policy.registryTtlMs;
+  const capabilityStale =
+    input.capabilityAgeMs === null || input.capabilityAgeMs > policy.capabilityTtlMs;
   let overall: FreshnessState;
   if (!input.trusted) {
     overall = "UNTRUSTED";
@@ -76,6 +97,8 @@ export function summarizeFreshness(input: SnapshotInput): FreshnessSnapshot {
     overall = "STALE";
   } else if (input.gapped) {
     overall = "GAPPED";
+  } else if (skewSuspect || registryStale || capabilityStale) {
+    overall = "STALE";
   } else if (input.tickState === "STALE" || input.tickState === "UNTRUSTED") {
     overall = "STALE";
   } else if (input.tickState === "GAPPED") {
@@ -103,6 +126,9 @@ export function summarizeFreshness(input: SnapshotInput): FreshnessSnapshot {
     skewSeconds: input.skewSeconds,
     skewState,
     trusted: input.trusted,
+    registryStale,
+    capabilityStale,
+    skewSuspect,
     overall,
   };
 }

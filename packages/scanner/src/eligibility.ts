@@ -3,7 +3,7 @@
  * Deterministic eligibility states. Eligibility is NOT a trading signal and
  * no direction-selection logic lives here.
  */
-import type { ExpirySeconds, ProposalQuote } from "@deriv-trader/domain";
+import type { ContractDirection, ExpirySeconds, ProposalQuote } from "@deriv-trader/domain";
 import { EFFECTIVE_PAYOUT_THRESHOLD } from "@deriv-trader/domain";
 import type { FreshnessSnapshot, FreshnessState } from "@deriv-trader/market-data";
 
@@ -94,15 +94,14 @@ export function evaluateEligibility(input: EligibilityInput): EligibilityResult 
 }
 
 export interface OpportunityInput extends EligibilityInput {
-  readonly callCompatible: boolean;
-  readonly putCompatible: boolean;
+  readonly direction: ContractDirection;
 }
 
 /**
- * Eligibility from the assembled freshness authority (F7). The candidate's
- * tick freshness is the snapshot's overall verdict — never reconstructed
- * from partial signals here. Trust/proposal state also flow from the
- * snapshot; market/contract/expiry/user/api gates stay explicit inputs.
+ * Eligibility from the assembled freshness authority (R3). Snapshot gate
+ * state (registry/capability staleness, suspect skew, trust) is consumed
+ * directly and fails closed — never reconstructed from partial arguments.
+ * Market/contract/expiry/user/api gates stay explicit inputs.
  */
 export function eligibilityFromSnapshot(
   snapshot: FreshnessSnapshot,
@@ -118,6 +117,24 @@ export function eligibilityFromSnapshot(
     readonly proposalTtlMs?: number;
   },
 ): EligibilityResult {
+  if (snapshot.skewSuspect) {
+    return {
+      state: "UNKNOWN_FAIL_CLOSED",
+      reason: `suspect clock skew for ${snapshot.underlyingSymbol}`,
+    };
+  }
+  if (snapshot.registryStale) {
+    return {
+      state: "UNKNOWN_FAIL_CLOSED",
+      reason: `stale symbol-registry authority for ${snapshot.underlyingSymbol}`,
+    };
+  }
+  if (snapshot.capabilityStale) {
+    return {
+      state: "UNKNOWN_FAIL_CLOSED",
+      reason: `stale capability authority for ${snapshot.underlyingSymbol}`,
+    };
+  }
   return evaluateEligibility({
     underlyingSymbol: snapshot.underlyingSymbol,
     expirySeconds: snapshot.expirySeconds,
@@ -136,10 +153,12 @@ export function eligibilityFromSnapshot(
 
 export interface Opportunity {
   readonly underlyingSymbol: string;
+  readonly direction: ContractDirection;
   readonly expirySeconds: ExpirySeconds;
-  readonly callCompatible: boolean;
-  readonly putCompatible: boolean;
+  readonly proposalKey: string;
+  readonly proposalId: string | null;
   readonly effectivePayout: number | null;
+  readonly breakEven: number | null;
   readonly freshness: FreshnessState;
   readonly eligibility: EligibilityState;
   readonly blockerReason: string;
@@ -149,10 +168,12 @@ export function buildOpportunity(input: OpportunityInput): Opportunity {
   const result = evaluateEligibility(input);
   return {
     underlyingSymbol: input.underlyingSymbol,
+    direction: input.direction,
     expirySeconds: input.expirySeconds,
-    callCompatible: input.callCompatible,
-    putCompatible: input.putCompatible,
+    proposalKey: input.quote?.key ?? "",
+    proposalId: input.quote?.proposalId ?? null,
     effectivePayout: input.quote?.effectivePayout ?? null,
+    breakEven: input.quote?.breakEven ?? null,
     freshness: input.tickFreshness,
     eligibility: result.state,
     blockerReason: result.state === "ELIGIBLE" ? "" : result.reason,

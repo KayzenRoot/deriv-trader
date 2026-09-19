@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import type { ProposalAssumptions, ProposalQuote } from "@deriv-trader/domain";
+import { summarizeFreshness, type SnapshotInput } from "@deriv-trader/market-data";
 import { PayoutPulseScheduler, type PulseCandidate, type PulseBudget } from "./pulse.js";
-import { evaluateEligibility, buildOpportunity } from "./eligibility.js";
+import { evaluateEligibility, buildOpportunity, eligibilityFromSnapshot } from "./eligibility.js";
 import type { EligibilityInput } from "./eligibility.js";
 
 function assumptions(symbol = "frxEURUSD"): ProposalAssumptions {
@@ -78,15 +79,81 @@ describe("eligibility engine", () => {
     expect(evaluateEligibility(eligibleInput({ apiHealthy: false })).state).toBe("API_DEGRADED");
   });
 
-  it("builds lattice opportunities with blocker reasons", () => {
+  it("builds direction-identified opportunities with blocker reasons", () => {
     const opportunity = buildOpportunity({
       ...eligibleInput({ quote: quote(0.5) }),
-      callCompatible: true,
-      putCompatible: false,
+      direction: "CALL",
     });
     expect(opportunity.eligibility).toBe("PAYOUT_TOO_LOW");
     expect(opportunity.blockerReason).toContain("below");
-    expect(opportunity.callCompatible).toBe(true);
+    expect(opportunity.direction).toBe("CALL");
+    expect(opportunity.proposalKey).toBe("k");
+    expect(opportunity.proposalId).toBe("p1");
+  });
+});
+
+function freshSnapshot(overrides: Partial<SnapshotInput> = {}) {
+  return summarizeFreshness({
+    underlyingSymbol: "frxEURUSD",
+    direction: "CALL",
+    expirySeconds: 60,
+    registryAgeMs: 1000,
+    registryState: "ACTIVE_ELIGIBLE",
+    capabilityAgeMs: 1000,
+    capabilityState: "OK",
+    tickAgeMs: 1000,
+    tickState: "FRESH",
+    invalidated: false,
+    gapped: false,
+    proposalAgeMs: 1000,
+    proposalKnown: true,
+    connectionEpoch: 0,
+    connectionHealthy: true,
+    skewSeconds: 1,
+    trusted: true,
+    ...overrides,
+  });
+}
+
+const SNAP_GATES = {
+  marketActive: true,
+  contractAvailable: true,
+  expirySupported: true,
+  userBlocked: false,
+  apiHealthy: true,
+} as const;
+
+describe("snapshot-driven eligibility (R3)", () => {
+  it("stays eligible when every authority is fresh", () => {
+    const result = eligibilityFromSnapshot(freshSnapshot(), quote(0.9), 1000, { ...SNAP_GATES });
+    expect(result.state).toBe("ELIGIBLE");
+  });
+
+  it("fails closed on stale capability authority", () => {
+    const snapshot = freshSnapshot({ capabilityAgeMs: 20 * 60_000 });
+    expect(snapshot.capabilityStale).toBe(true);
+    const result = eligibilityFromSnapshot(snapshot, quote(0.9), 1000, { ...SNAP_GATES });
+    expect(result.state).toBe("UNKNOWN_FAIL_CLOSED");
+  });
+
+  it("fails closed on stale registry authority", () => {
+    const snapshot = freshSnapshot({ registryAgeMs: 60 * 60_000 });
+    expect(snapshot.registryStale).toBe(true);
+    const result = eligibilityFromSnapshot(snapshot, quote(0.9), 1000, { ...SNAP_GATES });
+    expect(result.state).toBe("UNKNOWN_FAIL_CLOSED");
+  });
+
+  it("fails closed on suspect clock skew despite fresh ticks", () => {
+    const snapshot = freshSnapshot({ skewSeconds: 300 });
+    expect(snapshot.skewSuspect).toBe(true);
+    const result = eligibilityFromSnapshot(snapshot, quote(0.9), 1000, { ...SNAP_GATES });
+    expect(result.state).toBe("UNKNOWN_FAIL_CLOSED");
+  });
+
+  it("fails closed on stale proposals via the snapshot TTL", () => {
+    const snapshot = freshSnapshot({ proposalAgeMs: 120_000, proposalKnown: false });
+    const result = eligibilityFromSnapshot(snapshot, quote(null), 120_000, { ...SNAP_GATES });
+    expect(result.state).toBe("PROPOSAL_STALE");
   });
 });
 

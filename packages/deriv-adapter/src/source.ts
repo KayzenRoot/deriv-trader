@@ -62,8 +62,8 @@ export class DerivPublicMarketSource implements MarketDataSource {
     throw new BrokerRequestError(mapped.category, mapped.brokerCode);
   }
 
-  private noteSuccess(): void {
-    this.budget.recordSuccess();
+  private noteSuccess(group: BudgetGroup): void {
+    this.budget.recordSuccess(group);
   }
 
   async getActiveSymbols(): Promise<ActiveInstrument[]> {
@@ -75,7 +75,7 @@ export class DerivPublicMarketSource implements MarketDataSource {
     if (!parsed.success || !parsed.data.active_symbols) {
       throw new BrokerRequestError("SCHEMA_MISMATCH", "active_symbols");
     }
-    this.noteSuccess();
+    this.noteSuccess("other");
     const out: ActiveInstrument[] = [];
     for (const item of parsed.data.active_symbols) {
       const normalized = normalizeActiveSymbol(item);
@@ -93,7 +93,7 @@ export class DerivPublicMarketSource implements MarketDataSource {
     if (!parsed.success || !parsed.data.contracts_for?.available) {
       throw new BrokerRequestError("SCHEMA_MISMATCH", "contracts_for");
     }
-    this.noteSuccess();
+    this.noteSuccess("other");
     const out: ContractCapability[] = [];
     for (const item of parsed.data.contracts_for.available) {
       const normalized = normalizeContractItem(underlyingSymbol, item);
@@ -132,7 +132,7 @@ export class DerivPublicMarketSource implements MarketDataSource {
       if (error instanceof SubscribeRejectedError) this.guard(error.response, "other");
       throw error;
     }
-    this.noteSuccess();
+    this.noteSuccess("other");
     return { subscriptionId: `ticks:${underlyingSymbol}`, unsubscribe };
   }
 
@@ -154,7 +154,7 @@ export class DerivPublicMarketSource implements MarketDataSource {
       adjust_start_time: 1,
     });
     this.guard(raw, "other");
-    this.noteSuccess();
+    this.noteSuccess("other");
     return normalizeHistory(underlyingSymbol, raw, {
       receiveTime: this.stamp(),
       sourceConnectionId: this.client.connectionId,
@@ -194,7 +194,7 @@ export class DerivPublicMarketSource implements MarketDataSource {
     // Single-count ownership (F4): this admit above is the ONE charge for the
     // one broker send. Schedulers only peek, never admit.
     this.guard(raw, "proposal");
-    this.noteSuccess();
+    this.noteSuccess("proposal");
     const envelope = raw as { proposal?: unknown };
     return normalizeProposal(
       assumptions,

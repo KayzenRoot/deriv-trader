@@ -104,6 +104,22 @@ describe("API budget manager", () => {
     expect(budget.telemetry("other").rejectedCount).toBeGreaterThan(0);
     clock.advance(61_000);
     expect(budget.admit("MARKET_DISCOVERY").admitted).toBe(true);
-    budget.recordSuccess();
+    budget.recordSuccess("other");
+  });
+
+  it("isolates backoff escalation per group (R5)", () => {
+    const clock = makeClock(0);
+    const budget = new ApiBudgetManager({}, clock);
+    budget.recordRateLimited("proposal");
+    budget.recordRateLimited("proposal");
+    expect(budget.admit("SIGNAL_PROPOSAL").admitted).toBe(false);
+    // Success in another group must not weaken the proposal episode.
+    budget.recordSuccess("other");
+    expect(budget.admit("SIGNAL_PROPOSAL").admitted).toBe(false);
+    // Only the owning group's success clears its own backoff.
+    clock.advance(61_000);
+    budget.recordSuccess("proposal");
+    expect(budget.admit("SIGNAL_PROPOSAL").admitted).toBe(true);
+    expect(budget.telemetry("other").backoffUntilMs).toBeNull();
   });
 });

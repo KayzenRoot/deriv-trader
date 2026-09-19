@@ -107,8 +107,10 @@ describe("symbol registry", () => {
     // No CALL/PUT capability or proven expiry yet → unsupported until proven.
     expect(records.every((r) => r.state === "ACTIVE_UNSUPPORTED")).toBe(true);
     await registry.refreshCapabilities("frxEURUSD");
-    registry.proveExpiry("frxEURUSD", 60);
+    registry.proveExpiry("frxEURUSD", 60, "CALL");
     expect(registry.get("frxEURUSD")?.state).toBe("ACTIVE_ELIGIBLE");
+    expect(registry.isProven("frxEURUSD", "CALL", 60)).toBe(true);
+    expect(registry.isProven("frxEURUSD", "PUT", 60)).toBe(false);
     expect(source.calls).toContain("contracts_for:frxEURUSD");
   });
 
@@ -121,8 +123,8 @@ describe("symbol registry", () => {
     await registry.refreshSymbols();
     await registry.refreshCapabilities("frxEURUSD");
     await registry.refreshCapabilities("R_100");
-    registry.proveExpiry("frxEURUSD", 60);
-    registry.proveExpiry("R_100", 60);
+    registry.proveExpiry("frxEURUSD", 60, "CALL");
+    registry.proveExpiry("R_100", 60, "PUT");
     expect(registry.get("R_100")?.state).toBe("CLOSED");
     registry.setFilter({ allow: null, block: ["frxEURUSD"] });
     expect(registry.get("frxEURUSD")?.state).toBe("INACTIVE");

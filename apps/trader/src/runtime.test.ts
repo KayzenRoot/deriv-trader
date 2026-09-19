@@ -175,7 +175,8 @@ describe("assembled MarketScannerRuntime", () => {
     fixture.setQuoter((a) => quoteFor(a, a.durationSeconds === 60 ? 0.9 : null));
     await runtime.connect();
     await runtime.probeExpiries();
-    expect(runtime.registry.get("frxEURUSD")?.supportedExpiries).toEqual([60]);
+    expect(runtime.registry.isProven("frxEURUSD", "CALL", 60)).toBe(true);
+    expect(runtime.registry.isProven("frxEURUSD", "PUT", 60)).toBe(true);
     await runtime.probeExpiries();
     await runtime.probeExpiries();
     const lattice = runtime.lattice();
@@ -183,6 +184,49 @@ describe("assembled MarketScannerRuntime", () => {
     expect(expiries.has(60)).toBe(true);
     expect(expiries.has(180)).toBe(false);
     expect(expiries.has(300)).toBe(false);
+    await runtime.stop();
+  });
+
+  it("proves directions independently: CALL success never proves PUT", async () => {
+    const clock = makeClock();
+    const fixture = fixtureTransport(["frxEURUSD"]);
+    const runtime = new MarketScannerRuntime({
+      config: testConfig(),
+      source: fixture.source,
+      clock,
+      captureRoot: mkdtempSync(join(tmpdir(), "dt-rt-")),
+    });
+    // CALL 60s valid while PUT 60s rejects; PUT 180s valid while CALL rejects.
+    fixture.setQuoter((a) => {
+      if (a.contractType === "CALL" && a.durationSeconds === 60) return quoteFor(a, 0.9);
+      if (a.contractType === "PUT" && a.durationSeconds === 180) return quoteFor(a, 0.9);
+      return quoteFor(a, null);
+    });
+    await runtime.connect();
+    await runtime.probeExpiries();
+    await runtime.probeExpiries();
+    await runtime.probeExpiries();
+    expect(runtime.registry.isProven("frxEURUSD", "CALL", 60)).toBe(true);
+    expect(runtime.registry.isProven("frxEURUSD", "PUT", 60)).toBe(false);
+    expect(runtime.registry.isProven("frxEURUSD", "PUT", 180)).toBe(true);
+    expect(runtime.registry.isProven("frxEURUSD", "CALL", 180)).toBe(false);
+    await runtime.ensureTicks(["frxEURUSD"]);
+    fixture.emitTick("frxEURUSD", 1_700_000_100, 1.0851);
+    clock.advance(1000);
+    const lattice = runtime.lattice();
+    const put60 = lattice.opportunities.filter(
+      (o) => o.direction === "PUT" && o.expirySeconds === 60,
+    );
+    // Unproven PUT 60s has no snapshots at all: unsupported directions never
+    // appear, let alone as ELIGIBLE.
+    expect(put60).toHaveLength(0);
+    const call60 = lattice.opportunities.filter(
+      (o) => o.direction === "CALL" && o.expirySeconds === 60,
+    );
+    expect(call60).toHaveLength(1);
+    expect(call60[0]?.eligibility).toBe("ELIGIBLE");
+    expect(call60[0]?.proposalKey).toContain("CALL");
+    expect(typeof call60[0]?.breakEven).toBe("number");
     await runtime.stop();
   });
 
@@ -317,7 +361,8 @@ describe("assembled MarketScannerRuntime", () => {
     });
     await runtime.connect();
     // Manually prove an expiry so the lattice has candidates with no economics.
-    runtime.registry.proveExpiry("frxEURUSD", 60);
+    runtime.registry.proveExpiry("frxEURUSD", 60, "CALL");
+    runtime.registry.proveExpiry("frxEURUSD", 60, "PUT");
     await runtime.ensureTicks(["frxEURUSD"]);
     fixture.emitTick("frxEURUSD", 1_700_000_100, 1.0851);
     const lattice = runtime.lattice();
@@ -325,5 +370,120 @@ describe("assembled MarketScannerRuntime", () => {
     expect(lattice.eligible).toBe(0);
     expect(lattice.opportunities.every((o) => o.eligibility === "PROPOSAL_STALE")).toBe(true);
     await runtime.stop();
+  });
+
+  it("partitions capture by symbol and symbol+expiry with prunable readback (R6)", async () => {
+    const { readdirSync, statSync } = await import("node:fs");
+    const clock = makeClock();
+    const fixture = fixtureTransport(["frxEURUSD", "R_100"]);
+    const root = mkdtempSync(join(tmpdir(), "dt-part-"));
+    const runtime = new MarketScannerRuntime({
+      config: testConfig(),
+      source: fixture.source,
+      clock,
+      captureRoot: root,
+    });
+    fixture.setQuoter((a) => quoteFor(a, a.durationSeconds === 60 || a.durationSeconds === 180 ? 0.9 : null));
+    await runtime.connect();
+    await runtime.probeExpiries();
+    await runtime.ensureTicks();
+    fixture.emitTick("frxEURUSD", 1_700_000_100, 1.0851);
+    fixture.emitTick("R_100", 1_700_000_100, 501);
+    clock.advance(2000);
+    const result = await runtime.captureCycle();
+    expect(result.finalized).toBeGreaterThan(0);
+    const files: string[] = [];
+    const walk = (dir: string): void => {
+      for (const entry of readdirSync(dir)) {
+        const full = join(dir, entry);
+        if (statSync(full).isDirectory()) walk(full);
+        else if (full.endsWith(".parquet")) files.push(full);
+      }
+    };
+    walk(root);
+    // Symbol-partitioned ticks and symbol+expiry proposals, passport lists all.
+    expect(files.some((f) => f.includes("symbol=frxEURUSD"))).toBe(true);
+    expect(files.some((f) => f.includes("symbol=R_100"))).toBe(true);
+    expect(files.some((f) => f.includes("expiry_s=60"))).toBe(true);
+    expect(files.some((f) => f.includes("expiry_s=180"))).toBe(true);
+    expect(files.every((f) => f.includes("symbol="))).toBe(true);
+    const { openMemory, readParquetCount } = await import("@deriv-trader/research");
+    const { connection } = await openMemory();
+    try {
+      const eurTicks = files.filter((f) => f.includes(join("ticks")) && f.includes("symbol=frxEURUSD"));
+      expect(eurTicks).toHaveLength(1);
+      expect(await readParquetCount(connection, eurTicks[0] ?? "")).toBe(1);
+      const eur60 = files.filter((f) => f.includes("symbol=frxEURUSD") && f.includes("expiry_s=60"));
+      expect(eur60).toHaveLength(1);
+      expect(await readParquetCount(connection, eur60[0] ?? "")).toBeGreaterThan(0);
+    } finally {
+      connection.closeSync();
+    }
+    await runtime.stop();
+  });
+
+  it("reports stopped and disconnected lifecycles as idle capture (R4)", async () => {
+    const clock = makeClock();
+    const fixture = fixtureTransport(["frxEURUSD"]);
+    const runtime = new MarketScannerRuntime({
+      config: testConfig(),
+      source: fixture.source,
+      clock,
+      captureRoot: mkdtempSync(join(tmpdir(), "dt-life-")),
+    });
+    expect(runtime.loopState().lifecycle).toBe("idle");
+    expect(runtime.statusData().capture).toBe("idle");
+    await runtime.connect();
+    await runtime.ensureTicks(["frxEURUSD"]);
+    fixture.emitTick("frxEURUSD", 1_700_000_100, 1.0851);
+    expect(runtime.statusData().capture).toBe("live");
+    await runtime.stop();
+    expect(runtime.loopState().lifecycle).toBe("stopped");
+    expect(runtime.statusData().capture).toBe("idle");
+  });
+});
+
+describe("continuous read-only lifecycle (R7)", () => {
+  it("runs bounded cycles on timers without overlap and pauses cleanly", async () => {
+    const { vi } = await import("vitest");
+    vi.useFakeTimers();
+    try {
+      const clock = makeClock();
+      const fixture = fixtureTransport(["frxEURUSD"]);
+      const runtime = new MarketScannerRuntime({
+        config: testConfig(),
+        source: fixture.source,
+        clock,
+        captureRoot: mkdtempSync(join(tmpdir(), "dt-loop-")),
+      });
+      // Constructing starts nothing: no timers, no sends.
+      expect(runtime.loopState()).toMatchObject({ lifecycle: "idle", timers: 0 });
+      expect(fixture.sends()).toBe(0);
+      await runtime.connect();
+      runtime.startReadOnlyScanner({ universeMs: 1000, pulseMs: 1000, captureMs: 1000 });
+      expect(runtime.loopState().timers).toBe(3);
+      // Periodic repetition: poll to the condition with a hard cap instead of
+      // asserting exact cadence (cycle latency varies; skips are by design).
+      for (let i = 0; i < 20; i += 1) {
+        const current = runtime.loopState().counters;
+        if (current.universe >= 2 && current.pulse >= 2 && current.capture >= 2) break;
+        await vi.advanceTimersByTimeAsync(500);
+      }
+      const counters = runtime.loopState().counters;
+      expect(counters.universe).toBeGreaterThanOrEqual(2);
+      expect(counters.pulse).toBeGreaterThanOrEqual(2);
+      expect(counters.capture).toBeGreaterThanOrEqual(2);
+      expect(runtime.loopState().maxConcurrentCycles).toBeLessThanOrEqual(1);
+      runtime.pauseReadOnlyScanner();
+      expect(runtime.loopState()).toMatchObject({ timers: 0 });
+      expect(runtime.loopState().lifecycle).toBe("paused");
+      expect(runtime.statusData().capture).toBe("idle");
+      const frozen = { ...runtime.loopState().counters };
+      await vi.advanceTimersByTimeAsync(5000);
+      expect(runtime.loopState().counters).toEqual(frozen);
+      await runtime.stop();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

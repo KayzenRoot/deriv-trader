@@ -17,6 +17,7 @@ import type {
 import type {
   Clock,
   ConnectionHealth,
+  ContractDirection,
   ExpirySeconds,
   MarketDataSource,
   ProposalAssumptions,
@@ -59,6 +60,8 @@ import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 export const PARSER_VERSION = "deriv-options-2026-09-18";
+
+export type RuntimeLifecycle = "idle" | "running" | "paused" | "stopped";
 const EXPIRIES: ExpirySeconds[] = [60, 180, 300];
 const PROBE_FAILURE_REVOKE_AFTER = 3;
 
@@ -104,7 +107,8 @@ export class MarketScannerRuntime {
   private readonly universeCap: number;
   private readonly quotes = new Map<string, CachedQuote>();
   private snapshots: FreshnessSnapshot[] = [];
-  private readonly revoked = new Map<string, Set<ExpirySeconds>>();
+  /** Revoked capability keyed symbol -> expiry -> directions (R2). */
+  private readonly revoked = new Map<string, Map<ExpirySeconds, Set<ContractDirection>>>();
   private readonly probeFailures = new Map<string, number>();
   private readonly registryAges = new Map<string, { symbolsAt: number; capabilityAt: number | null }>();
   private readonly skew = new Map<string, number>();
@@ -120,7 +124,13 @@ export class MarketScannerRuntime {
   private lastDiskMb: number | null = null;
   private diskStopped = false;
   private duckdb: { instance: DuckDBInstance; connection: DuckDBConnection } | null = null;
-  private started = false;
+  private lifecycle: RuntimeLifecycle = "idle";
+  private loopTimers: ReturnType<typeof setInterval>[] = [];
+  private loopRunning = false;
+  private readonly loopCounters = { universe: 0, pulse: 0, capture: 0 };
+  private skippedCycles = 0;
+  private maxConcurrentCycles = 0;
+  private activeCycles = 0;
 
   constructor(options: RuntimeOptions) {
     this.config = options.config;
@@ -201,11 +211,85 @@ export class MarketScannerRuntime {
 
   /** CONNECT: supervisor drives socket + first restore; then initial universe. */
   async connect(): Promise<void> {
-    this.started = true;
+    this.lifecycle = "running";
     if (this.supervisor) {
       await this.supervisor.start();
     }
     await this.refreshUniverse();
+  }
+
+  /**
+   * Explicit continuous read-only lifecycle (R7) for later Runner control.
+   * Bounded periodic universe refresh, tick upkeep, pulse cycles and capture
+   * rolls with overlap guard; no auto-start on construct or GET routes.
+   */
+  startReadOnlyScanner(options: {
+    readonly universeMs?: number;
+    readonly pulseMs?: number;
+    readonly captureMs?: number;
+  } = {}): void {
+    if (this.lifecycle === "running" && this.loopTimers.length > 0) return;
+    this.lifecycle = "running";
+    const universeMs = options.universeMs ?? this.config.scannerLoopUniverseMs;
+    const pulseMs = options.pulseMs ?? this.config.scannerLoopPulseMs;
+    const captureMs = options.captureMs ?? this.config.captureRollMs;
+    const every = (ms: number, task: () => Promise<void>): void => {
+      const timer = setInterval(() => {
+        if (this.lifecycle !== "running") return;
+        if (this.loopRunning) {
+          this.skippedCycles += 1;
+          return;
+        }
+        this.loopRunning = true;
+        this.activeCycles += 1;
+        this.maxConcurrentCycles = Math.max(this.maxConcurrentCycles, this.activeCycles);
+        void task()
+          .catch(() => undefined)
+          .finally(() => {
+            this.activeCycles -= 1;
+            this.loopRunning = false;
+          });
+      }, ms);
+      const unref = timer as unknown as { unref?: () => void };
+      unref.unref?.();
+      this.loopTimers.push(timer);
+    };
+    every(universeMs, async () => {
+      this.loopCounters.universe += 1;
+      await this.refreshUniverse();
+      await this.ensureTicks();
+    });
+    every(pulseMs, async () => {
+      this.loopCounters.pulse += 1;
+      await this.scannerCycle();
+    });
+    every(captureMs, async () => {
+      this.loopCounters.capture += 1;
+      await this.captureCycle();
+    });
+  }
+
+  /** Pause the loop: timers cancelled, lifecycle paused, capture idle. */
+  pauseReadOnlyScanner(): void {
+    for (const timer of this.loopTimers) clearInterval(timer);
+    this.loopTimers = [];
+    if (this.lifecycle === "running") this.lifecycle = "paused";
+  }
+
+  loopState(): {
+    readonly lifecycle: RuntimeLifecycle;
+    readonly timers: number;
+    readonly counters: { readonly universe: number; readonly pulse: number; readonly capture: number };
+    readonly maxConcurrentCycles: number;
+    readonly skippedCycles: number;
+  } {
+    return {
+      lifecycle: this.lifecycle,
+      timers: this.loopTimers.length,
+      counters: { ...this.loopCounters },
+      maxConcurrentCycles: this.maxConcurrentCycles,
+      skippedCycles: this.skippedCycles,
+    };
   }
 
   /** Symbols + capabilities for the current universe (bounded per cycle). */
@@ -255,29 +339,31 @@ export class MarketScannerRuntime {
     ).slice(0, this.universeCap);
     for (const record of records) {
       const symbol = record.instrument.underlyingSymbol;
-      const revokedSet = this.revoked.get(symbol) ?? new Set<ExpirySeconds>();
+      const revokedForSymbol =
+        this.revoked.get(symbol) ?? new Map<ExpirySeconds, Set<ContractDirection>>();
       for (const expiry of EXPIRIES) {
-        if (record.supportedExpiries.includes(expiry) || revokedSet.has(expiry)) continue;
-        const hasCall = record.capabilities.some((c) => c.contractType === "CALL");
-        const hasPut = record.capabilities.some((c) => c.contractType === "PUT");
-        if (!hasCall && !hasPut) continue;
         for (const direction of ["CALL", "PUT"] as const) {
-          if (direction === "CALL" && !hasCall) continue;
-          if (direction === "PUT" && !hasPut) continue;
+          if (!this.directionCompatible(record, direction)) continue;
+          if (this.registry.isProven(symbol, direction, expiry)) continue;
+          if (revokedForSymbol.get(expiry)?.has(direction)) continue;
           const assumptions = this.probeAssumptions(symbol, direction, expiry);
           const quote = await this.source.requestProposal(assumptions);
           this.storeQuote(quote);
           const key = `${symbol}|${direction}|${String(expiry)}`;
           if (quote.state === "KNOWN" && quote.effectivePayout !== null) {
-            this.registry.proveExpiry(symbol, expiry);
+            // Direction-specific proof: a CALL success never proves PUT.
+            this.registry.proveExpiry(symbol, expiry, direction);
             this.probeFailures.delete(key);
             proven += 1;
           } else {
             const failures = (this.probeFailures.get(key) ?? 0) + 1;
             this.probeFailures.set(key, failures);
             if (failures >= PROBE_FAILURE_REVOKE_AFTER) {
-              revokedSet.add(expiry);
-              this.revoked.set(symbol, revokedSet);
+              const revokedDirs =
+                revokedForSymbol.get(expiry) ?? new Set<ContractDirection>();
+              revokedDirs.add(direction);
+              revokedForSymbol.set(expiry, revokedDirs);
+              this.revoked.set(symbol, revokedForSymbol);
               revoked += 1;
             }
           }
@@ -285,6 +371,17 @@ export class MarketScannerRuntime {
       }
     }
     return { proven, revoked };
+  }
+
+  private directionCompatible(
+    record: { capabilities: { contractType: string }[] },
+    direction: ContractDirection,
+  ): boolean {
+    return record.capabilities.some((c) => c.contractType === direction);
+  }
+
+  private isRevoked(symbol: string, direction: ContractDirection, expiry: ExpirySeconds): boolean {
+    return this.revoked.get(symbol)?.get(expiry)?.has(direction) === true;
   }
 
   private storeQuote(quote: ProposalQuote): void {
@@ -341,14 +438,15 @@ export class MarketScannerRuntime {
     const out: PulseCandidate[] = [];
     for (const record of this.registry.symbols()) {
       const symbol = record.instrument.underlyingSymbol;
-      const revokedSet = this.revoked.get(symbol);
-      for (const expiry of record.supportedExpiries) {
-        if (revokedSet?.has(expiry)) continue;
-        for (const direction of ["CALL", "PUT"] as const) {
-          const key = `${symbol}|${direction}|${String(expiry)}|${this.config.scannerProbeCurrency}|${this.config.scannerProbeBasis}|${String(this.config.scannerProbeAmount)}`;
+      for (const proven of record.provenExpiries) {
+        for (const direction of proven.directions) {
+          // Both contract-compatible AND proven for this exact direction.
+          if (!this.directionCompatible(record, direction)) continue;
+          if (this.isRevoked(symbol, direction, proven.expiry)) continue;
+          const key = `${symbol}|${direction}|${String(proven.expiry)}|${this.config.scannerProbeCurrency}|${this.config.scannerProbeBasis}|${String(this.config.scannerProbeAmount)}`;
           const cached = this.quotes.get(key);
           out.push({
-            assumptions: this.probeAssumptions(symbol, direction, expiry),
+            assumptions: this.probeAssumptions(symbol, direction, proven.expiry),
             priority: cached ? 3 : 4,
             signalDemand: false,
             lastQuoteAtMs: cached?.receivedAtMs ?? null,
@@ -373,32 +471,39 @@ export class MarketScannerRuntime {
       const ages = this.registryAges.get(symbol);
       const inspect = this.hub.inspect(symbol);
       const tickState = this.hub.freshness(symbol, healthy);
-      const revokedSet = this.revoked.get(symbol);
-      for (const expiry of record.supportedExpiries) {
-        if (revokedSet?.has(expiry)) continue;
-        for (const direction of ["CALL", "PUT"] as const) {
+      for (const proven of record.provenExpiries) {
+        for (const direction of proven.directions) {
+          if (this.isRevoked(symbol, direction, proven.expiry)) continue;
+          const expiry = proven.expiry;
           const key = `${symbol}|${direction}|${String(expiry)}|${this.config.scannerProbeCurrency}|${this.config.scannerProbeBasis}|${String(this.config.scannerProbeAmount)}`;
           const cached = this.quotes.get(key);
           snapshots.push(
-            summarizeFreshness({
-              underlyingSymbol: symbol,
-              direction,
-              expirySeconds: expiry,
-              registryAgeMs: ages ? now - ages.symbolsAt : null,
-              registryState: record.state,
-              capabilityAgeMs: ages?.capabilityAt ? now - ages.capabilityAt : null,
-              capabilityState: record.error ? "ERROR" : "OK",
-              tickAgeMs: inspect && inspect.count > 0 ? Math.max(0, now - inspect.lastSeenAtMs) : null,
-              tickState,
-              invalidated: inspect?.invalidated ?? true,
-              gapped: inspect?.gap ?? false,
-              proposalAgeMs: cached ? now - cached.receivedAtMs : null,
-              proposalKnown: cached?.quote.state === "KNOWN",
-              connectionEpoch: epoch,
-              connectionHealthy: healthy,
-              skewSeconds: this.skew.get(symbol) ?? null,
-              trusted: !this.untrusted.has(symbol) && !(inspect?.untrusted ?? false),
-            }),
+            summarizeFreshness(
+              {
+                underlyingSymbol: symbol,
+                direction,
+                expirySeconds: expiry,
+                registryAgeMs: ages ? now - ages.symbolsAt : null,
+                registryState: record.state,
+                capabilityAgeMs: ages?.capabilityAt ? now - ages.capabilityAt : null,
+                capabilityState: record.error ? "ERROR" : "OK",
+                tickAgeMs: inspect && inspect.count > 0 ? Math.max(0, now - inspect.lastSeenAtMs) : null,
+                tickState,
+                invalidated: inspect?.invalidated ?? true,
+                gapped: inspect?.gap ?? false,
+                proposalAgeMs: cached ? now - cached.receivedAtMs : null,
+                proposalKnown: cached?.quote.state === "KNOWN",
+                connectionEpoch: epoch,
+                connectionHealthy: healthy,
+                skewSeconds: this.skew.get(symbol) ?? null,
+                trusted: !this.untrusted.has(symbol) && !(inspect?.untrusted ?? false),
+              },
+              {
+                registryTtlMs: this.config.scannerRegistryTtlMs,
+                capabilityTtlMs: this.config.scannerCapabilityTtlMs,
+                skewToleranceSeconds: this.config.scannerSkewToleranceS,
+              },
+            ),
           );
         }
       }
@@ -415,20 +520,22 @@ export class MarketScannerRuntime {
       const record = this.registry.get(snapshot.underlyingSymbol);
       const key = `${snapshot.underlyingSymbol}|${snapshot.direction}|${String(snapshot.expirySeconds)}|${this.config.scannerProbeCurrency}|${this.config.scannerProbeBasis}|${String(this.config.scannerProbeAmount)}`;
       const cached = this.quotes.get(key);
-      const callCompatible =
-        record?.capabilities.some((c) => c.contractType === "CALL") ?? false;
-      const putCompatible =
-        record?.capabilities.some((c) => c.contractType === "PUT") ?? false;
+      // Exact-direction gating (R2): never CALL || PUT.
+      const contractAvailable =
+        record?.capabilities.some((c) => c.contractType === snapshot.direction) === true;
       const result = eligibilityFromSnapshot(
         snapshot,
         cached?.quote ?? null,
         cached ? this.clock.nowMs() - cached.receivedAtMs : null,
         {
           marketActive: record?.state === "ACTIVE_ELIGIBLE",
-          contractAvailable: callCompatible || putCompatible,
+          contractAvailable,
           expirySupported:
-            record?.supportedExpiries.includes(snapshot.expirySeconds) === true &&
-            !(this.revoked.get(snapshot.underlyingSymbol)?.has(snapshot.expirySeconds) === true),
+            this.registry.isProven(
+              snapshot.underlyingSymbol,
+              snapshot.direction,
+              snapshot.expirySeconds,
+            ) && !this.isRevoked(snapshot.underlyingSymbol, snapshot.direction, snapshot.expirySeconds),
           userBlocked: record?.state === "INACTIVE",
           apiHealthy: this.supervisor === null ? true : this.supervisor.getState() === "HEALTHY",
           threshold: this.config.scannerPayoutThreshold,
@@ -437,10 +544,12 @@ export class MarketScannerRuntime {
       );
       opportunities.push({
         underlyingSymbol: snapshot.underlyingSymbol,
+        direction: snapshot.direction,
         expirySeconds: snapshot.expirySeconds,
-        callCompatible,
-        putCompatible,
+        proposalKey: cached?.quote.key ?? "",
+        proposalId: cached?.quote.proposalId ?? null,
         effectivePayout: cached?.quote.effectivePayout ?? null,
+        breakEven: cached?.quote.breakEven ?? null,
         freshness: snapshot.overall,
         eligibility: result.state,
         blockerReason: result.state === "ELIGIBLE" ? "" : result.reason,
@@ -537,8 +646,13 @@ export class MarketScannerRuntime {
         (c) => c.contractType === "CALL" || c.contractType === "PUT",
       );
       if (hasCallPut) capable += 1;
-      const revokedSet = this.revoked.get(record.instrument.underlyingSymbol);
-      proven += record.supportedExpiries.filter((e) => !revokedSet?.has(e)).length;
+      for (const entry of record.provenExpiries) {
+        for (const direction of entry.directions) {
+          if (!this.isRevoked(record.instrument.underlyingSymbol, direction, entry.expiry)) {
+            proven += 1;
+          }
+        }
+      }
     }
     return {
       threshold: this.config.scannerPayoutThreshold,
@@ -643,20 +757,38 @@ export class MarketScannerRuntime {
     const date = new Date(this.clock.nowMs()).toISOString().slice(0, 10);
     let finalized = 0;
     const files: { path: string; sha256: string; rows: number }[] = [];
-    if (tickRows.length > 0) {
-      await insertTicks(connection, tickRows);
-      const part = `ticks/date=${date}/part-${String(this.partCounter).padStart(4, "0")}.parquet`;
+    // Symbol/expiry grouping for partition pruning (R6); direction stays in
+    // row content. One file per populated partition per batch.
+    const ticksBySymbol = new Map<string, TickRow[]>();
+    for (const row of tickRows) {
+      const group = ticksBySymbol.get(row.underlyingSymbol) ?? [];
+      group.push(row);
+      ticksBySymbol.set(row.underlyingSymbol, group);
+    }
+    const safeSymbol = (symbol: string): string =>
+      symbol.replace(/[^A-Za-z0-9_.-]/g, "_").slice(0, 64) || "unknown";
+    for (const [symbol, rows] of [...ticksBySymbol.entries()].sort(([a], [b]) => (a < b ? -1 : 1))) {
+      await insertTicks(connection, rows);
+      const part = `ticks/date=${date}/symbol=${safeSymbol(symbol)}/part-${String(this.partCounter).padStart(4, "0")}.parquet`;
       const finalPath = join(this.captureRoot, part);
       await finalizeParquet(connection, "ticks", finalPath);
-      files.push({ path: part, sha256: fileSha256(readFileSync(finalPath)), rows: tickRows.length });
+      files.push({ path: part, sha256: fileSha256(readFileSync(finalPath)), rows: rows.length });
       finalized += 1;
     }
-    if (proposalRows.length > 0) {
-      await insertProposals(connection, proposalRows);
-      const part = `proposals/date=${date}/part-${String(this.partCounter).padStart(4, "0")}.parquet`;
+    const proposalsByPartition = new Map<string, ProposalRow[]>();
+    for (const row of proposalRows) {
+      const key = `${row.underlyingSymbol}|${String(row.durationSeconds)}`;
+      const group = proposalsByPartition.get(key) ?? [];
+      group.push(row);
+      proposalsByPartition.set(key, group);
+    }
+    for (const [key, rows] of [...proposalsByPartition.entries()].sort(([a], [b]) => (a < b ? -1 : 1))) {
+      const [symbol = "unknown", expiry = "0"] = key.split("|");
+      await insertProposals(connection, rows);
+      const part = `proposals/date=${date}/symbol=${safeSymbol(symbol)}/expiry_s=${expiry}/part-${String(this.partCounter).padStart(4, "0")}.parquet`;
       const finalPath = join(this.captureRoot, part);
       await finalizeParquet(connection, "proposals", finalPath);
-      files.push({ path: part, sha256: fileSha256(readFileSync(finalPath)), rows: proposalRows.length });
+      files.push({ path: part, sha256: fileSha256(readFileSync(finalPath)), rows: rows.length });
       finalized += 1;
     }
     this.partCounter += 1;
@@ -709,6 +841,7 @@ export class MarketScannerRuntime {
     diskMb: number | null;
     diskStopped: boolean;
     captureActive: boolean;
+    lifecycle: RuntimeLifecycle;
   } {
     return {
       snapshots: this.snapshots,
@@ -720,11 +853,21 @@ export class MarketScannerRuntime {
       findings: this.findings,
       diskMb: this.lastDiskMb,
       diskStopped: this.diskStopped,
-      captureActive: this.started,
+      // Truthful liveness (R4): running lifecycle AND a live market stream
+      // (HEALTHY supervisor, or any external subscription without one) AND
+      // no disk stop. connect() alone, a disconnect, or stop() all read idle.
+      captureActive:
+        this.lifecycle === "running" &&
+        !this.diskStopped &&
+        (this.supervisor ? this.supervisor.getState() === "HEALTHY" : this.hub.externalCount() > 0),
+      lifecycle: this.lifecycle,
     };
   }
 
   async stop(): Promise<void> {
+    for (const timer of this.loopTimers) clearInterval(timer);
+    this.loopTimers = [];
+    this.lifecycle = "stopped";
     await this.supervisor?.stop();
     await this.captureCycle().catch(() => undefined);
     if (this.duckdb) {

@@ -12,9 +12,10 @@ export type {
 } from "./registry.js";
 export { SharedTickHub, classifyFreshness, DEFAULT_THRESHOLDS } from "./ticks.js";
 export type { FreshnessState, FreshnessInput, FreshnessThresholds } from "./ticks.js";
-export { summarizeFreshness } from "./freshness.js";
+export { summarizeFreshness, DEFAULT_FRESHNESS_POLICY } from "./freshness.js";
 export type {
   ContinuityState,
+  FreshnessPolicy,
   FreshnessSnapshot,
   SkewState,
   SnapshotInput,

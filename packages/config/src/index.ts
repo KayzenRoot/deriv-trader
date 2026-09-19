@@ -41,6 +41,13 @@ const envSchema = z.object({
   SCANNER_PROBE_CURRENCY: z.string().min(1).default("USD"),
   SCANNER_PROBE_BASIS: z.string().min(1).default("stake"),
   SCANNER_PROPOSAL_TTL_MS: z.coerce.number().int().min(1000).default(30000),
+  // --- Freshness authority TTLs/tolerances (R3; operational tuning) ---
+  SCANNER_REGISTRY_TTL_MS: z.coerce.number().int().min(1000).default(1800000),
+  SCANNER_CAPABILITY_TTL_MS: z.coerce.number().int().min(1000).default(900000),
+  SCANNER_SKEW_TOLERANCE_S: z.coerce.number().int().min(1).default(60),
+  // --- Continuous read-only loop cadence (R7; bounded, overlap-guarded) ---
+  SCANNER_LOOP_UNIVERSE_MS: z.coerce.number().int().min(1000).default(60000),
+  SCANNER_LOOP_PULSE_MS: z.coerce.number().int().min(1000).default(15000),
   // --- Local capture (DT-WP-02) ---
   CAPTURE_BATCH_ROWS: z.coerce.number().int().min(10).max(100000).default(500),
   CAPTURE_ROLL_MS: z.coerce.number().int().min(1000).default(60000),
@@ -76,6 +83,11 @@ export type AppConfig = {
   readonly scannerProbeCurrency: string;
   readonly scannerProbeBasis: string;
   readonly scannerProposalTtlMs: number;
+  readonly scannerRegistryTtlMs: number;
+  readonly scannerCapabilityTtlMs: number;
+  readonly scannerSkewToleranceS: number;
+  readonly scannerLoopUniverseMs: number;
+  readonly scannerLoopPulseMs: number;
   readonly captureBatchRows: number;
   readonly captureRollMs: number;
   readonly diskWarnMb: number;
@@ -111,6 +123,11 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     SCANNER_PROBE_CURRENCY: env["SCANNER_PROBE_CURRENCY"],
     SCANNER_PROBE_BASIS: env["SCANNER_PROBE_BASIS"],
     SCANNER_PROPOSAL_TTL_MS: env["SCANNER_PROPOSAL_TTL_MS"],
+    SCANNER_REGISTRY_TTL_MS: env["SCANNER_REGISTRY_TTL_MS"],
+    SCANNER_CAPABILITY_TTL_MS: env["SCANNER_CAPABILITY_TTL_MS"],
+    SCANNER_SKEW_TOLERANCE_S: env["SCANNER_SKEW_TOLERANCE_S"],
+    SCANNER_LOOP_UNIVERSE_MS: env["SCANNER_LOOP_UNIVERSE_MS"],
+    SCANNER_LOOP_PULSE_MS: env["SCANNER_LOOP_PULSE_MS"],
     CAPTURE_BATCH_ROWS: env["CAPTURE_BATCH_ROWS"],
     CAPTURE_ROLL_MS: env["CAPTURE_ROLL_MS"],
     DATA_DISK_WARN_MB: env["DATA_DISK_WARN_MB"],
@@ -144,6 +161,11 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     scannerProbeCurrency: parsed.SCANNER_PROBE_CURRENCY,
     scannerProbeBasis: parsed.SCANNER_PROBE_BASIS,
     scannerProposalTtlMs: parsed.SCANNER_PROPOSAL_TTL_MS,
+    scannerRegistryTtlMs: parsed.SCANNER_REGISTRY_TTL_MS,
+    scannerCapabilityTtlMs: parsed.SCANNER_CAPABILITY_TTL_MS,
+    scannerSkewToleranceS: parsed.SCANNER_SKEW_TOLERANCE_S,
+    scannerLoopUniverseMs: parsed.SCANNER_LOOP_UNIVERSE_MS,
+    scannerLoopPulseMs: parsed.SCANNER_LOOP_PULSE_MS,
     captureBatchRows: parsed.CAPTURE_BATCH_ROWS,
     captureRollMs: parsed.CAPTURE_ROLL_MS,
     diskWarnMb: parsed.DATA_DISK_WARN_MB,

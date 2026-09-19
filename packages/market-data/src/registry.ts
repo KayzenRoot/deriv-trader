@@ -3,12 +3,14 @@
  * The universe is built dynamically from active_symbols + contracts_for.
  * No hard-coded tradable-symbol list. Duration support (60/180/300s) is never
  * inferred from missing metadata — it must be proven by proposal probing
- * (scanner layer) and recorded explicitly per symbol.
+ * (scanner layer) and recorded explicitly per symbol + direction (R2: a CALL
+ * proof never proves PUT).
  */
 import type {
   ActiveInstrument,
   Clock,
   ContractCapability,
+  ContractDirection,
   ExpirySeconds,
   MarketDataSource,
 } from "@deriv-trader/domain";
@@ -22,11 +24,17 @@ export type InstrumentState =
   | "STALE"
   | "ERROR";
 
+export interface ProvenDirection {
+  readonly expiry: ExpirySeconds;
+  readonly directions: readonly ContractDirection[];
+}
+
 export interface RegistryRecord {
   readonly instrument: ActiveInstrument;
   readonly capabilities: ContractCapability[];
   readonly state: InstrumentState;
-  readonly supportedExpiries: ExpirySeconds[];
+  /** Proven support keyed per expiry, directions proven independently. */
+  readonly provenExpiries: ProvenDirection[];
   readonly lastSymbolsRefreshAt: string;
   readonly lastCapabilityRefreshAt: string | null;
   readonly error: string | null;
@@ -96,7 +104,7 @@ export class SymbolRegistry {
       (c) => c.contractType === "CALL" || c.contractType === "PUT",
     );
     if (!hasCallPut) return "ACTIVE_UNSUPPORTED";
-    if (record.supportedExpiries.length === 0) return "ACTIVE_UNSUPPORTED";
+    if (!record.provenExpiries.some((p) => p.directions.length > 0)) return "ACTIVE_UNSUPPORTED";
     return "ACTIVE_ELIGIBLE";
   }
 
@@ -111,7 +119,7 @@ export class SymbolRegistry {
         instrument,
         capabilities: previous?.capabilities ?? [],
         state: "STALE",
-        supportedExpiries: previous?.supportedExpiries ?? [],
+        provenExpiries: previous?.provenExpiries ?? [],
         lastSymbolsRefreshAt: now,
         lastCapabilityRefreshAt: previous?.lastCapabilityRefreshAt ?? null,
         error: null,
@@ -156,15 +164,35 @@ export class SymbolRegistry {
     }
   }
 
-  /** Record proven expiry support (from bounded proposal probing). */
-  proveExpiry(underlyingSymbol: string, expiry: ExpirySeconds): void {
+  /**
+   * Record proven expiry support for one direction (from bounded proposal
+   * probing). A CALL proof never proves PUT and vice versa (R2).
+   */
+  proveExpiry(underlyingSymbol: string, expiry: ExpirySeconds, direction: ContractDirection): void {
     const record = this.records.get(underlyingSymbol);
-    if (!record || record.supportedExpiries.includes(expiry)) return;
-    const supported = [...record.supportedExpiries, expiry].sort(
-      (a, b) => EXPIRIES.indexOf(a) - EXPIRIES.indexOf(b),
-    );
-    const updated = { ...record, supportedExpiries: supported };
+    if (!record) return;
+    const existing = record.provenExpiries.find((p) => p.expiry === expiry);
+    if (existing?.directions.includes(direction)) return;
+    const provenExpiries = record.provenExpiries
+      .filter((p) => p.expiry !== expiry)
+      .concat([
+        {
+          expiry,
+          directions: [...(existing?.directions ?? []), direction].sort(),
+        },
+      ])
+      .sort((a, b) => EXPIRIES.indexOf(a.expiry) - EXPIRIES.indexOf(b.expiry));
+    const updated = { ...record, provenExpiries };
     this.records.set(underlyingSymbol, { ...updated, state: this.applyState(updated) });
+  }
+
+  isProven(underlyingSymbol: string, direction: ContractDirection, expiry: ExpirySeconds): boolean {
+    return (
+      this.records
+        .get(underlyingSymbol)
+        ?.provenExpiries.find((p) => p.expiry === expiry)
+        ?.directions.includes(direction) === true
+    );
   }
 
   symbolsAgeMs(): number {

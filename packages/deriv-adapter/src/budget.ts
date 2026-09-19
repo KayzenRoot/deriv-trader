@@ -103,7 +103,7 @@ export class ApiBudgetManager {
   private readonly rejectedCount = new Map<BudgetGroup, number>();
   private readonly queues = new Map<BudgetGroup, QueuedItem[]>();
   private readonly backoffUntil = new Map<BudgetGroup, number>();
-  private backoffLevel = 0;
+  private readonly backoffLevel = new Map<BudgetGroup, number>();
   private reconnects = 0;
 
   constructor(config: Partial<BudgetConfig> = {}, clock?: Clock) {
@@ -125,16 +125,22 @@ export class ApiBudgetManager {
     this.reconnects += 1;
   }
 
-  /** Bounded backoff after a broker rate-limit rejection (no retry storm). */
+  /** Bounded per-group backoff after a broker rate-limit rejection. */
   recordRateLimited(group: BudgetGroup): void {
-    this.backoffLevel = Math.min(this.backoffLevel + 1, 6);
-    const delay = Math.min(1000 * 2 ** this.backoffLevel, 60000);
+    const level = Math.min((this.backoffLevel.get(group) ?? 0) + 1, 6);
+    this.backoffLevel.set(group, level);
+    const delay = Math.min(1000 * 2 ** level, 60000);
     this.backoffUntil.set(group, this.clock.nowMs() + delay);
     this.rejectedCount.set(group, (this.rejectedCount.get(group) ?? 0) + 1);
   }
 
-  recordSuccess(): void {
-    this.backoffLevel = 0;
+  /**
+   * Success clears ONLY the given group's escalation (R5). A healthy group
+   * never weakens another group's ongoing rate-limit episode.
+   */
+  recordSuccess(group: BudgetGroup): void {
+    this.backoffLevel.set(group, 0);
+    this.backoffUntil.delete(group);
   }
 
   private prune(group: BudgetGroup, now: number): number[] {
