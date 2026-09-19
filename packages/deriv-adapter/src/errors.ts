@@ -12,6 +12,19 @@ export interface NormalizedBrokerError {
   readonly safeMessage: string;
 }
 
+/** Thrown on the request path when the broker answers with an error envelope. */
+export class BrokerRequestError extends Error {
+  readonly category: BrokerErrorCategory;
+  readonly brokerCode: string;
+
+  constructor(category: BrokerErrorCategory, brokerCode: string) {
+    super(`${category}: ${safeMessageFor(category)}`);
+    this.name = "BrokerRequestError";
+    this.category = category;
+    this.brokerCode = brokerCode;
+  }
+}
+
 const CODE_MAP: [RegExp, BrokerErrorCategory][] = [
   [/rate.?limit|too_many_requests|429/i, "RATE_LIMITED"],
   [/input.*valid|validation/i, "VALIDATION_ERROR"],

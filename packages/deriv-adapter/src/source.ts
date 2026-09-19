@@ -15,9 +15,12 @@ import type {
 } from "@deriv-trader/domain";
 import { systemClock } from "@deriv-trader/domain";
 import type { ApiBudgetManager } from "./budget.js";
+import type { BudgetGroup } from "./budget.js";
 import { normalizeActiveSymbol, normalizeContractItem, normalizeHistory, normalizeProposal, normalizeTick, SCHEMA_VERSION } from "./normalize.js";
 import { activeSymbolsResponseSchema, contractsForResponseSchema } from "./schemas.js";
 import type { PublicWsClient } from "./transport.js";
+import { SubscribeRejectedError } from "./transport.js";
+import { BrokerRequestError, extractErrorParts, mapBrokerError } from "./errors.js";
 
 export interface MarketSourceOptions {
   readonly clock?: Clock;
@@ -43,14 +46,36 @@ export class DerivPublicMarketSource implements MarketDataSource {
     return new Date(this.clock.nowMs()).toISOString();
   }
 
+  /**
+   * Broker error envelopes are detected here on the request path, before
+   * normal schema parsing, so SCHEMA_MISMATCH stays distinct from broker
+   * validation/rate-limit/auth-like errors. Rate limits feed backoff for the
+   * group that actually sent the request (no retry storms); successes clear
+   * the episode per policy. Only the broker code is retained for audit —
+   * never raw payloads or secrets.
+   */
+  private guard(raw: unknown, group: BudgetGroup): void {
+    const parts = extractErrorParts(raw);
+    if (parts.code === null && parts.message === null) return;
+    const mapped = mapBrokerError(parts.code, parts.message);
+    if (mapped.category === "RATE_LIMITED") this.budget.recordRateLimited(group);
+    throw new BrokerRequestError(mapped.category, mapped.brokerCode);
+  }
+
+  private noteSuccess(): void {
+    this.budget.recordSuccess();
+  }
+
   async getActiveSymbols(): Promise<ActiveInstrument[]> {
     const admit = this.budget.admit("MARKET_DISCOVERY");
     if (!admit.admitted) throw new Error(`budget throttled: ${admit.reason}`);
     const raw = await this.client.request({ active_symbols: "brief" });
+    this.guard(raw, "other");
     const parsed = activeSymbolsResponseSchema.safeParse(raw);
     if (!parsed.success || !parsed.data.active_symbols) {
-      throw new Error("SCHEMA_MISMATCH: active_symbols");
+      throw new BrokerRequestError("SCHEMA_MISMATCH", "active_symbols");
     }
+    this.noteSuccess();
     const out: ActiveInstrument[] = [];
     for (const item of parsed.data.active_symbols) {
       const normalized = normalizeActiveSymbol(item);
@@ -63,10 +88,12 @@ export class DerivPublicMarketSource implements MarketDataSource {
     const admit = this.budget.admit("MARKET_DISCOVERY");
     if (!admit.admitted) throw new Error(`budget throttled: ${admit.reason}`);
     const raw = await this.client.request({ contracts_for: underlyingSymbol });
+    this.guard(raw, "other");
     const parsed = contractsForResponseSchema.safeParse(raw);
     if (!parsed.success || !parsed.data.contracts_for?.available) {
-      throw new Error("SCHEMA_MISMATCH: contracts_for");
+      throw new BrokerRequestError("SCHEMA_MISMATCH", "contracts_for");
     }
+    this.noteSuccess();
     const out: ContractCapability[] = [];
     for (const item of parsed.data.contracts_for.available) {
       const normalized = normalizeContractItem(underlyingSymbol, item);
@@ -81,22 +108,31 @@ export class DerivPublicMarketSource implements MarketDataSource {
   ): Promise<{ subscriptionId: string; unsubscribe: () => Promise<void> }> {
     const admit = this.budget.admit("MARKET_DISCOVERY");
     if (!admit.admitted) throw new Error(`budget throttled: ${admit.reason}`);
-    const { unsubscribe } = await this.client.subscribe(
-      { ticks: underlyingSymbol },
-      (message: unknown) => {
-        const envelope = message as { tick?: unknown; subscription?: { id?: string } };
-        this.sequence += 1;
-        const tick = normalizeTick(envelope.tick ?? null, {
-          receiveTime: this.stamp(),
-          sourceConnectionId: this.client.connectionId,
-          sequence: this.sequence,
-          reqId: null,
-          subscriptionId:
-            typeof envelope.subscription?.id === "string" ? envelope.subscription.id : null,
-        });
-        if (tick) handler({ ...tick, underlyingSymbol });
-      },
-    );
+    let unsubscribe: () => Promise<void>;
+    try {
+      ({ unsubscribe } = await this.client.subscribe(
+        { ticks: underlyingSymbol },
+        (message: unknown) => {
+          const envelope = message as { tick?: unknown; subscription?: { id?: string } };
+          this.sequence += 1;
+          const tick = normalizeTick(envelope.tick ?? null, {
+            receiveTime: this.stamp(),
+            sourceConnectionId: this.client.connectionId,
+            sequence: this.sequence,
+            reqId: null,
+            subscriptionId:
+              typeof envelope.subscription?.id === "string" ? envelope.subscription.id : null,
+          });
+          if (tick) handler({ ...tick, underlyingSymbol });
+        },
+      ));
+    } catch (error) {
+      // Classify rejected subscriptions (e.g. rate limits feed backoff) instead
+      // of leaking the raw envelope.
+      if (error instanceof SubscribeRejectedError) this.guard(error.response, "other");
+      throw error;
+    }
+    this.noteSuccess();
     return { subscriptionId: `ticks:${underlyingSymbol}`, unsubscribe };
   }
 
@@ -117,6 +153,8 @@ export class DerivPublicMarketSource implements MarketDataSource {
       count: bounded,
       adjust_start_time: 1,
     });
+    this.guard(raw, "other");
+    this.noteSuccess();
     return normalizeHistory(underlyingSymbol, raw, {
       receiveTime: this.stamp(),
       sourceConnectionId: this.client.connectionId,
@@ -153,6 +191,10 @@ export class DerivPublicMarketSource implements MarketDataSource {
       duration_unit: "s",
       underlying_symbol: assumptions.underlyingSymbol,
     });
+    // Single-count ownership (F4): this admit above is the ONE charge for the
+    // one broker send. Schedulers only peek, never admit.
+    this.guard(raw, "proposal");
+    this.noteSuccess();
     const envelope = raw as { proposal?: unknown };
     return normalizeProposal(
       assumptions,

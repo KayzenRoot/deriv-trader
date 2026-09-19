@@ -20,6 +20,17 @@ export type SocketFactory = (url: string) => WsSocket;
 
 export const OPEN_STATE = 1;
 
+/** Carries the raw broker envelope of a rejected subscription for classification upstream. */
+export class SubscribeRejectedError extends Error {
+  readonly response: unknown;
+
+  constructor(message: string, response: unknown) {
+    super(message);
+    this.name = "SubscribeRejectedError";
+    this.response = response;
+  }
+}
+
 export interface TransportOptions {
   readonly clock?: Clock;
   readonly socketFactory?: SocketFactory;
@@ -201,10 +212,29 @@ export class PublicWsClient {
     });
   }
 
+  private decode(data: unknown): string | null {
+    if (typeof data === "string") return data;
+    // Live sockets deliver text frames as binary buffers; decode them.
+    // (Unit fakes send strings, which is why this only bites against Deriv.)
+    try {
+      if (data instanceof Uint8Array) return new TextDecoder().decode(data);
+      if (data instanceof ArrayBuffer) return new TextDecoder().decode(new Uint8Array(data));
+      if (Array.isArray(data)) {
+        return data
+          .map((chunk) => (chunk instanceof Uint8Array ? new TextDecoder().decode(chunk) : ""))
+          .join("");
+      }
+    } catch {
+      return null;
+    }
+    return null;
+  }
+
   private routeMessage(data: unknown): void {
+    const text = this.decode(data);
+    if (text === null) return;
     let parsed: { req_id?: unknown; subscription?: unknown; error?: unknown };
     try {
-      const text = typeof data === "string" ? data : JSON.stringify(data);
       parsed = JSON.parse(text) as { req_id?: unknown; subscription?: unknown; error?: unknown };
     } catch {
       return;
@@ -273,7 +303,10 @@ export class PublicWsClient {
     };
     if (response.error) {
       this.subscriptions.delete(routeKey);
-      throw new Error(`subscribe rejected: ${errorMessage(response.error)}`);
+      throw new SubscribeRejectedError(
+        `subscribe rejected: ${errorMessage(response.error)}`,
+        response,
+      );
     }
     const brokerId = response.subscription?.id;
     if (typeof brokerId === "string") {

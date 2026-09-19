@@ -31,6 +31,10 @@ const envSchema = z.object({
   API_BUDGET_OTHER_PER_MIN: z.coerce.number().int().min(1).default(220),
   API_BUDGET_OTHER_PER_HOUR: z.coerce.number().int().min(1).default(14400),
   API_BUDGET_PROPOSAL_RESERVE: z.coerce.number().min(0).max(0.9).default(0.3),
+  // REST IP windows per official limits; authenticated-user 80/min is
+  // explicitly deferred (WP-02 performs no authenticated REST).
+  API_BUDGET_REST_PER_MIN: z.coerce.number().int().min(1).default(300),
+  API_BUDGET_REST_PER_10MIN: z.coerce.number().int().min(1).default(1000),
   // --- Scanner economics (DT-WP-02) ---
   SCANNER_PAYOUT_THRESHOLD: z.coerce.number().min(0).default(0.8),
   SCANNER_PROBE_AMOUNT: z.coerce.number().positive().default(10),
@@ -65,6 +69,8 @@ export type AppConfig = {
   readonly budgetOtherPerMin: number;
   readonly budgetOtherPerHour: number;
   readonly budgetProposalReserve: number;
+  readonly budgetRestPerMin: number;
+  readonly budgetRestPer10Min: number;
   readonly scannerPayoutThreshold: number;
   readonly scannerProbeAmount: number;
   readonly scannerProbeCurrency: string;
@@ -98,6 +104,8 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     API_BUDGET_OTHER_PER_MIN: env["API_BUDGET_OTHER_PER_MIN"],
     API_BUDGET_OTHER_PER_HOUR: env["API_BUDGET_OTHER_PER_HOUR"],
     API_BUDGET_PROPOSAL_RESERVE: env["API_BUDGET_PROPOSAL_RESERVE"],
+    API_BUDGET_REST_PER_MIN: env["API_BUDGET_REST_PER_MIN"],
+    API_BUDGET_REST_PER_10MIN: env["API_BUDGET_REST_PER_10MIN"],
     SCANNER_PAYOUT_THRESHOLD: env["SCANNER_PAYOUT_THRESHOLD"],
     SCANNER_PROBE_AMOUNT: env["SCANNER_PROBE_AMOUNT"],
     SCANNER_PROBE_CURRENCY: env["SCANNER_PROBE_CURRENCY"],
@@ -129,6 +137,8 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     budgetOtherPerMin: parsed.API_BUDGET_OTHER_PER_MIN,
     budgetOtherPerHour: parsed.API_BUDGET_OTHER_PER_HOUR,
     budgetProposalReserve: parsed.API_BUDGET_PROPOSAL_RESERVE,
+    budgetRestPerMin: parsed.API_BUDGET_REST_PER_MIN,
+    budgetRestPer10Min: parsed.API_BUDGET_REST_PER_10MIN,
     scannerPayoutThreshold: parsed.SCANNER_PAYOUT_THRESHOLD,
     scannerProbeAmount: parsed.SCANNER_PROBE_AMOUNT,
     scannerProbeCurrency: parsed.SCANNER_PROBE_CURRENCY,

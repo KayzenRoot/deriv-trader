@@ -93,7 +93,7 @@ describe("eligibility engine", () => {
 describe("payout pulse scheduler", () => {
   it("prioritizes signal demand and never schedules the reserve", async () => {
     const clock = makeClock(0);
-    const budget: PulseBudget = { admit: () => ({ admitted: true, reason: "ok" }) };
+    const budget: PulseBudget = { peek: () => true };
     const quoted: string[] = [];
     const scheduler = new PayoutPulseScheduler(
       budget,
@@ -125,7 +125,7 @@ describe("payout pulse scheduler", () => {
     const clock = makeClock(0);
     let calls = 0;
     const budget: PulseBudget = {
-      admit: () => (calls < 1 ? { admitted: true, reason: "ok" } : { admitted: false, reason: "empty" }),
+      peek: () => calls < 1,
     };
     const scheduler = new PayoutPulseScheduler(
       budget,

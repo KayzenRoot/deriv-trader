@@ -5,7 +5,7 @@
  */
 import type { ExpirySeconds, ProposalQuote } from "@deriv-trader/domain";
 import { EFFECTIVE_PAYOUT_THRESHOLD } from "@deriv-trader/domain";
-import type { FreshnessState } from "@deriv-trader/market-data";
+import type { FreshnessSnapshot, FreshnessState } from "@deriv-trader/market-data";
 
 export type EligibilityState =
   | "ELIGIBLE"
@@ -96,6 +96,42 @@ export function evaluateEligibility(input: EligibilityInput): EligibilityResult 
 export interface OpportunityInput extends EligibilityInput {
   readonly callCompatible: boolean;
   readonly putCompatible: boolean;
+}
+
+/**
+ * Eligibility from the assembled freshness authority (F7). The candidate's
+ * tick freshness is the snapshot's overall verdict — never reconstructed
+ * from partial signals here. Trust/proposal state also flow from the
+ * snapshot; market/contract/expiry/user/api gates stay explicit inputs.
+ */
+export function eligibilityFromSnapshot(
+  snapshot: FreshnessSnapshot,
+  quote: ProposalQuote | null,
+  quoteAgeMs: number | null,
+  gates: {
+    readonly marketActive: boolean;
+    readonly contractAvailable: boolean;
+    readonly expirySupported: boolean;
+    readonly userBlocked: boolean;
+    readonly apiHealthy: boolean;
+    readonly threshold?: number;
+    readonly proposalTtlMs?: number;
+  },
+): EligibilityResult {
+  return evaluateEligibility({
+    underlyingSymbol: snapshot.underlyingSymbol,
+    expirySeconds: snapshot.expirySeconds,
+    marketActive: gates.marketActive,
+    contractAvailable: gates.contractAvailable,
+    expirySupported: gates.expirySupported,
+    tickFreshness: snapshot.overall,
+    quote,
+    quoteAgeMs,
+    userBlocked: gates.userBlocked,
+    apiHealthy: gates.apiHealthy,
+    ...(gates.threshold === undefined ? {} : { threshold: gates.threshold }),
+    ...(gates.proposalTtlMs === undefined ? {} : { proposalTtlMs: gates.proposalTtlMs }),
+  });
 }
 
 export interface Opportunity {

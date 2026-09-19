@@ -86,9 +86,9 @@ export function createTraderService(options: TraderServiceOptions = {}): TraderS
   const market: MarketModule = createMarketModule(config);
 
   void app.get("/v1/market/status", () => marketStatus(market));
-  void app.get("/v1/scanner/status", () => scannerStatus(market, config));
-  void app.get("/v1/scanner/opportunities", () => opportunities(market, config));
-  void app.get("/v1/data/status", () => dataStatus(market, config));
+  void app.get("/v1/scanner/status", () => scannerStatus(market));
+  void app.get("/v1/scanner/opportunities", () => opportunities(market));
+  void app.get("/v1/data/status", () => dataStatus(market));
 
   return {
     app,
@@ -101,7 +101,7 @@ export function createTraderService(options: TraderServiceOptions = {}): TraderS
     },
     close: async () => {
       mutable.state = "STOPPING";
-      await market.supervisor.stop().catch(() => undefined);
+      await market.runtime.stop().catch(() => undefined);
       await market.client.close().catch(() => undefined);
       await app.close();
       mutable.state = "STOPPED";

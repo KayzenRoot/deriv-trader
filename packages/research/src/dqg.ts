@@ -23,32 +23,42 @@ export function checkTicks(rows: TickRow[], options: DqgOptions = {}): DqgFindin
   const findings: DqgFinding[] = [];
   const maxGap = options.maxGapSeconds ?? 30;
   const maxSkew = options.maxSkewSeconds ?? 60;
-  const seen = new Set<string>();
+  // Continuity is per-symbol: different instruments interleave arbitrarily and
+  // must never be compared against each other.
+  const bySymbol = new Map<string, TickRow[]>();
+  for (const row of rows) {
+    const group = bySymbol.get(row.underlyingSymbol) ?? [];
+    group.push(row);
+    bySymbol.set(row.underlyingSymbol, group);
+  }
   let duplicates = 0;
   let nonMonotonic = 0;
   let invalidQuote = 0;
   let gaps = 0;
   let skewed = 0;
-  // Arrival order matters: a later arrival carrying an earlier event time is
-  // exactly the non-monotonic condition. Never sort before this check.
-  let maxEventTime: number | null = null;
-  let previous: TickRow | null = null;
-  for (const row of rows) {
-    const fingerprint = `${row.underlyingSymbol}|${String(row.eventTime)}|${String(row.quote)}`;
-    if (seen.has(fingerprint)) duplicates += 1;
-    seen.add(fingerprint);
-    if (!(row.quote > 0) || !Number.isFinite(row.quote)) invalidQuote += 1;
-    if (maxEventTime !== null && row.eventTime < maxEventTime) nonMonotonic += 1;
-    maxEventTime = maxEventTime === null ? row.eventTime : Math.max(maxEventTime, row.eventTime);
-    if (previous) {
-      if (row.eventTime - previous.eventTime > maxGap) gaps += 1;
+  for (const group of bySymbol.values()) {
+    const seen = new Set<string>();
+    // Arrival order matters: a later arrival carrying an earlier event time is
+    // exactly the non-monotonic condition. Never sort before this check.
+    let maxEventTime: number | null = null;
+    let previous: TickRow | null = null;
+    for (const row of group) {
+      const fingerprint = `${row.underlyingSymbol}|${String(row.eventTime)}|${String(row.quote)}`;
+      if (seen.has(fingerprint)) duplicates += 1;
+      seen.add(fingerprint);
+      if (!(row.quote > 0) || !Number.isFinite(row.quote)) invalidQuote += 1;
+      if (maxEventTime !== null && row.eventTime < maxEventTime) nonMonotonic += 1;
+      maxEventTime = maxEventTime === null ? row.eventTime : Math.max(maxEventTime, row.eventTime);
+      if (previous) {
+        if (row.eventTime - previous.eventTime > maxGap) gaps += 1;
+      }
+      const receiveMs = Date.parse(row.receiveTime);
+      if (Number.isFinite(receiveMs)) {
+        const skewSeconds = Math.abs(receiveMs / 1000 - row.eventTime);
+        if (skewSeconds > maxSkew) skewed += 1;
+      }
+      previous = row;
     }
-    const receiveMs = Date.parse(row.receiveTime);
-    if (Number.isFinite(receiveMs)) {
-      const skewSeconds = Math.abs(receiveMs / 1000 - row.eventTime);
-      if (skewSeconds > maxSkew) skewed += 1;
-    }
-    previous = row;
   }
   if (duplicates > 0) {
     findings.push({ check: "duplicates", severity: "WARN", detail: `${String(duplicates)} duplicate events`, count: duplicates });

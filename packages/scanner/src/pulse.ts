@@ -9,15 +9,12 @@ import type { Clock, ProposalAssumptions, ProposalQuote } from "@deriv-trader/do
 import { systemClock } from "@deriv-trader/domain";
 
 /**
- * Minimal budget port the scheduler needs. The real ApiBudgetManager
- * satisfies this structurally; trader injects it. Scanner never imports the
- * adapter package directly (package boundary).
+ * Minimal budget port the scheduler needs. Schedulers only PEEK availability;
+ * the single admit (charge) happens at the adapter request path, so one
+ * broker send always equals one budget charge (F4).
  */
 export interface PulseBudget {
-  admit(
-    budgetClass: "SIGNAL_PROPOSAL",
-    cost?: number,
-  ): { readonly admitted: boolean; readonly reason: string };
+  peek(budgetClass: "SIGNAL_PROPOSAL", cost?: number): boolean;
 }
 
 export type PulsePriority = 0 | 1 | 2 | 3 | 4;
@@ -95,12 +92,11 @@ export class PayoutPulseScheduler {
       .slice(0, this.config.batchLimit);
   }
 
-  /** Refresh due candidates while the proposal budget admits them. */
+  /** Refresh due candidates while the proposal budget has headroom (peek only). */
   async refresh(candidates: PulseCandidate[]): Promise<ProposalQuote[]> {
     const results: ProposalQuote[] = [];
     for (const candidate of this.order(candidates)) {
-      const admit = this.budget.admit("SIGNAL_PROPOSAL");
-      if (!admit.admitted) break;
+      if (!this.budget.peek("SIGNAL_PROPOSAL")) break;
       const quote = await this.quote(candidate.assumptions);
       candidate.lastQuoteAtMs = this.clock.nowMs();
       candidate.lastEffective = quote.effectivePayout;

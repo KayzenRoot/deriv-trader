@@ -39,7 +39,9 @@ const CLASS_PRIORITY: Record<BudgetClass, number> = {
 
 export interface BudgetWindow {
   readonly perMinute: number;
-  readonly perHour: number;
+  /** Long-window budget with its own rolling duration (WS groups use 1h). */
+  readonly perLong: number;
+  readonly longWindowMs: number;
 }
 
 export interface BudgetConfig {
@@ -57,9 +59,11 @@ export const BUDGET_DEFAULTS_VERSION = "2026-09-18";
 
 export const DEFAULT_BUDGET: BudgetConfig = {
   version: BUDGET_DEFAULTS_VERSION,
-  proposal: { perMinute: 360, perHour: 14400 },
-  other: { perMinute: 220, perHour: 14400 },
-  rest: { perMinute: 300, perHour: 10000 },
+  proposal: { perMinute: 360, perLong: 14400, longWindowMs: 3600_000 },
+  other: { perMinute: 220, perLong: 14400, longWindowMs: 3600_000 },
+  // Official REST limits: 300/min + 1000/10min per IP. Authenticated-user
+  // 80/min is explicitly deferred: WP-02 performs no authenticated REST.
+  rest: { perMinute: 300, perLong: 1000, longWindowMs: 600_000 },
   proposalReserveFraction: 0.3,
   maxQueueDepth: 100,
 };
@@ -74,9 +78,10 @@ export interface AdmitResult {
 export interface BudgetTelemetry {
   readonly group: BudgetGroup;
   readonly callsLastMinute: number;
-  readonly callsLastHour: number;
+  readonly callsLastLongWindow: number;
+  readonly longWindowMs: number;
   readonly estimatedRemainingMinute: number;
-  readonly estimatedRemainingHour: number;
+  readonly estimatedRemainingLong: number;
   readonly throttledCount: number;
   readonly rejectedCount: number;
   readonly queueDepth: number;
@@ -133,8 +138,9 @@ export class ApiBudgetManager {
   }
 
   private prune(group: BudgetGroup, now: number): number[] {
-    const hourAgo = now - 3600_000;
-    const kept = (this.calls.get(group) ?? []).filter((t) => t > hourAgo);
+    const window = this.config[group];
+    const oldestKept = now - window.longWindowMs;
+    const kept = (this.calls.get(group) ?? []).filter((t) => t > oldestKept);
     this.calls.set(group, kept);
     return kept;
   }
@@ -143,6 +149,28 @@ export class ApiBudgetManager {
     let count = 0;
     for (const t of calls) if (t >= sinceMs) count += 1;
     return count;
+  }
+
+  /**
+   * Availability inspection WITHOUT charging (F4). Schedulers call peek to
+   * order work; the adapter request path performs the single admit that
+   * counts the actual outbound send. One broker send == one budget charge.
+   */
+  peek(budgetClass: BudgetClass, cost = 1): boolean {
+    const group = CLASS_GROUP[budgetClass];
+    const window = this.config[group];
+    const now = this.clock.nowMs();
+    const backoffUntil = this.backoffUntil.get(group) ?? null;
+    if (backoffUntil !== null && now < backoffUntil) return false;
+    const calls = this.prune(group, now);
+    let ceiling = window.perMinute;
+    if (group === "proposal" && CLASS_PRIORITY[budgetClass] >= CLASS_PRIORITY.SIGNAL_PROPOSAL) {
+      ceiling = Math.floor(window.perMinute * (1 - this.config.proposalReserveFraction));
+    }
+    return (
+      this.countSince(calls, now - 60_000) + cost <= ceiling &&
+      calls.length + cost <= window.perLong
+    );
   }
 
   admit(budgetClass: BudgetClass, cost = 1): AdmitResult {
@@ -161,14 +189,14 @@ export class ApiBudgetManager {
     }
     const calls = this.prune(group, now);
     const lastMinute = this.countSince(calls, now - 60_000);
-    const lastHour = calls.length;
+    const lastLong = calls.length;
     let ceiling = window.perMinute;
     // Proposal reserve: scanner-class traffic stops early so future
     // execution/reconciliation keeps headroom.
     if (group === "proposal" && CLASS_PRIORITY[budgetClass] >= CLASS_PRIORITY.SIGNAL_PROPOSAL) {
       ceiling = Math.floor(window.perMinute * (1 - this.config.proposalReserveFraction));
     }
-    if (lastMinute + cost > ceiling || lastHour + cost > window.perHour) {
+    if (lastMinute + cost > ceiling || lastLong + cost > window.perLong) {
       const queue = this.queues.get(group) ?? [];
       if (queue.length < this.config.maxQueueDepth) {
         queue.push({ enqueuedAt: now, budgetClass });
@@ -197,7 +225,7 @@ export class ApiBudgetManager {
       const calls = this.prune(group, now);
       const window = this.config[group];
       if (this.countSince(calls, now - 60_000) + 1 > window.perMinute) continue;
-      if (calls.length + 1 > window.perHour) continue;
+      if (calls.length + 1 > window.perLong) continue;
       queue.shift();
       calls.push(now);
       this.calls.set(group, calls);
@@ -212,12 +240,14 @@ export class ApiBudgetManager {
     const window = this.config[group];
     const queue = this.queues.get(group) ?? [];
     const oldest = queue[0]?.enqueuedAt ?? null;
+    const lastMinute = this.countSince(calls, now - 60_000);
     return {
       group,
-      callsLastMinute: this.countSince(calls, now - 60_000),
-      callsLastHour: calls.length,
-      estimatedRemainingMinute: Math.max(0, window.perMinute - this.countSince(calls, now - 60_000)),
-      estimatedRemainingHour: Math.max(0, window.perHour - calls.length),
+      callsLastMinute: lastMinute,
+      callsLastLongWindow: calls.length,
+      longWindowMs: window.longWindowMs,
+      estimatedRemainingMinute: Math.max(0, window.perMinute - lastMinute),
+      estimatedRemainingLong: Math.max(0, window.perLong - calls.length),
       throttledCount: this.throttledCount.get(group) ?? 0,
       rejectedCount: this.rejectedCount.get(group) ?? 0,
       queueDepth: queue.length,

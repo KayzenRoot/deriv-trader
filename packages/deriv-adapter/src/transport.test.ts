@@ -15,6 +15,7 @@ interface FakeSocket extends WsSocket {
   readonly sent: string[];
   emitOpen(): void;
   emitMessage(payload: unknown): void;
+  emitBinary(bytes: Uint8Array): void;
   emitClose(): void;
 }
 
@@ -43,6 +44,9 @@ function makeFakeSocket(): FakeSocket {
     },
     emitMessage(payload: unknown): void {
       for (const h of handlers.get("message") ?? []) h(JSON.stringify(payload));
+    },
+    emitBinary(bytes: Uint8Array): void {
+      for (const h of handlers.get("message") ?? []) h(bytes);
     },
     emitClose(): void {
       (socket as { readyState: number }).readyState = 3;
@@ -154,6 +158,30 @@ describe("public WS transport", () => {
     await expect(forgetCall).resolves.toBe(true);
     expect(client.subscriptionCount()).toBe(0);
     await handle.unsubscribe().catch(() => undefined);
+    await client.close();
+  });
+
+  it("decodes binary text frames the way live sockets deliver them", async () => {
+    const sockets: FakeSocket[] = [];
+    const client = new PublicWsClient("wss://example.test/public", {
+      socketFactory: () => {
+        const s = makeFakeSocket();
+        sockets.push(s);
+        queueMicrotask(() => {
+          s.emitOpen();
+        });
+        return s;
+      },
+    });
+    const pending = client.request({ ping: 1 });
+    await vi.waitFor(() => {
+      expect(sockets[0]?.sent).toHaveLength(1);
+    });
+    const reqPayload = JSON.parse(sockets[0]?.sent[0] ?? "{}") as { req_id: number };
+    // Live `ws` sockets emit Buffer, not string, for text frames.
+    const wire = Buffer.from(JSON.stringify({ req_id: reqPayload.req_id, ping: "pong" }), "utf8");
+    sockets[0]?.emitBinary(wire);
+    await expect(pending).resolves.toMatchObject({ req_id: reqPayload.req_id });
     await client.close();
   });
 

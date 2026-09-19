@@ -38,7 +38,7 @@ export class NullDerivAdapter implements DerivAdapter {
 
 export { SCHEMA_VERSION } from "./normalize.js";
 export { coerceNumber } from "./normalize.js";
-export { PublicWsClient } from "./transport.js";
+export { PublicWsClient, SubscribeRejectedError } from "./transport.js";
 export type { SocketFactory, WsSocket, TransportOptions } from "./transport.js";
 export { ConnectionSupervisor } from "./supervisor.js";
 export type { SupervisorHooks } from "./supervisor.js";
@@ -50,7 +50,7 @@ export type {
   BudgetTelemetry,
   BudgetWindow,
 } from "./budget.js";
-export { mapBrokerError, extractErrorParts } from "./errors.js";
+export { mapBrokerError, extractErrorParts, BrokerRequestError } from "./errors.js";
 export type { NormalizedBrokerError } from "./errors.js";
 export { DerivPublicMarketSource } from "./source.js";
 export type { MarketSourceOptions } from "./source.js";

@@ -12,6 +12,7 @@ export {
   finalizeParquet,
   readParquetCount,
   readParquetTicks,
+  compactParquetFiles,
   tickPartition,
   proposalPartition,
   sanitize,
@@ -21,7 +22,7 @@ export { createPassport, verifyPassport, canonicalJson, sha256Hex, fileSha256 } 
 export type { DatasetPassport, PassportFile, PassportInput } from "./passport.js";
 export { checkTicks, checkProposals, checkPartitionOverlap, blocksDataset } from "./dqg.js";
 export type { DqgFinding, DqgOptions, DqgSeverity } from "./dqg.js";
-export { recoverDirectory, diskStatus, sha256File, verifyCompaction, fileSizeMb } from "./recovery.js";
+export { recoverDirectory, diskStatus, sha256File, digestRows, verifyCompactionContent, fileSizeMb, measureFreeDiskMb } from "./recovery.js";
 export type { RecoveryReport, DiskStatus, CompactionPlan } from "./recovery.js";
 export function summarizeDataset(rows: readonly { symbol: string }[]): {
   readonly name: string;

@@ -76,7 +76,10 @@ describe("API budget manager", () => {
   it("throttles scanner traffic before execution reserve", () => {
     const clock = makeClock(0);
     const budget = new ApiBudgetManager(
-      { proposal: { perMinute: 10, perHour: 100 }, proposalReserveFraction: 0.3 },
+      {
+        proposal: { perMinute: 10, perLong: 100, longWindowMs: 3600_000 },
+        proposalReserveFraction: 0.3,
+      },
       clock,
     );
     for (let i = 0; i < 7; i += 1) {

@@ -12,4 +12,11 @@ export type {
 } from "./registry.js";
 export { SharedTickHub, classifyFreshness, DEFAULT_THRESHOLDS } from "./ticks.js";
 export type { FreshnessState, FreshnessInput, FreshnessThresholds } from "./ticks.js";
+export { summarizeFreshness } from "./freshness.js";
+export type {
+  ContinuityState,
+  FreshnessSnapshot,
+  SkewState,
+  SnapshotInput,
+} from "./freshness.js";
 export type { Tick, Candle, MarketFreshness, MarketSnapshot } from "./legacy.js";

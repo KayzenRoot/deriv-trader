@@ -78,25 +78,63 @@ export interface CompactionPlan {
 }
 
 /**
- * Verify a compaction: merged row count must equal the summed inputs and the
- * merged content hash must match the hash of concatenated per-file row hashes
- * in input order (order-independent of filesystem listing).
+ * Deterministic multiset digest over actual row content (F9). Rows are
+ * canonicalized, sorted and hashed together, so the digest is independent of
+ * input file order but sensitive to any content change.
  */
-export function verifyCompaction(
-  inputRows: number[],
-  inputHashes: string[],
-  mergedRows: number,
-  mergedHash: string,
+export function digestRows(rows: readonly unknown[]): string {
+  const canonical = rows.map((row) => {
+    if (row === null || typeof row !== "object" || Array.isArray(row)) {
+      const text: unknown = JSON.stringify(row);
+      return typeof text === "string" ? text : "null";
+    }
+    const record = row as Record<string, unknown>;
+    const keys = Object.keys(record).sort();
+    const parts = keys.map((key) => {
+      const value: unknown = record[key];
+      const text: unknown = JSON.stringify(value);
+      return `${JSON.stringify(key)}:${typeof text === "string" ? text : "null"}`;
+    });
+    return `{${parts.join(",")}}`;
+  });
+  canonical.sort();
+  return createHash("sha256").update(canonical.join("\n"), "utf8").digest("hex");
+}
+
+/**
+ * Content-based compaction proof (F9): merged rows must preserve the exact
+ * multiset (row count plus content digest) of the inputs.
+ */
+export function verifyCompactionContent(
+  before: readonly unknown[],
+  after: readonly unknown[],
 ): boolean {
-  const expectedRows = inputRows.reduce((sum, n) => sum + n, 0);
-  if (mergedRows !== expectedRows) return false;
-  const expectedHash = createHash("sha256").update(inputHashes.join("|"), "utf8").digest("hex");
-  return mergedHash === expectedHash;
+  if (after.length !== before.length) return false;
+  return digestRows(before) === digestRows(after);
 }
 
 export function fileSizeMb(path: string): number | null {
   try {
     return statSync(path).size / (1024 * 1024);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Measured free disk space in MB via filesystem stats (F3). Returns null
+ * when the platform cannot report it — callers treat unknown as warn-level
+ * caution, never as proof of space.
+ */
+export async function measureFreeDiskMb(path: string): Promise<number | null> {
+  const { statfs } = await import("node:fs/promises");
+  try {
+    const stats = await statfs(path);
+    const bsize: unknown = stats.bsize;
+    const bfree: unknown = stats.bfree;
+    if (typeof bsize !== "number" || typeof bfree !== "number") return null;
+    if (!Number.isFinite(bsize) || !Number.isFinite(bfree) || bsize <= 0) return null;
+    return (bfree * bsize) / (1024 * 1024);
   } catch {
     return null;
   }

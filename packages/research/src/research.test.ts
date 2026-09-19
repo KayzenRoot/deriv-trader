@@ -9,6 +9,7 @@ import {
   checkPartitionOverlap,
   checkProposals,
   checkTicks,
+  compactParquetFiles,
   createPassport,
   diskStatus,
   fileSha256,
@@ -21,7 +22,7 @@ import {
   recoverDirectory,
   toProposalRow,
   toTickRow,
-  verifyCompaction,
+  verifyCompactionContent,
   verifyPassport,
   type ProposalRow,
   type TickRow,
@@ -189,9 +190,50 @@ describe("recovery, disk pressure and compaction", () => {
     expect(diskStatus(100, { warnMb: 1024, stopMb: 256 }).stop).toBe(true);
   });
 
-  it("verifies compaction row counts and hashes", () => {
-    expect(verifyCompaction([2, 3], ["aa", "bb"], 5, fileSha256(Buffer.from("aa|bb")))).toBe(true);
-    expect(verifyCompaction([2, 3], ["aa", "bb"], 4, fileSha256(Buffer.from("aa|bb")))).toBe(false);
+  it("verifies compaction preserves real row content", () => {
+    const before = [tickRow({ sequence: 1 }), tickRow({ sequence: 2 })];
+    const reordered = [tickRow({ sequence: 2 }), tickRow({ sequence: 1 })];
+    expect(verifyCompactionContent(before, reordered)).toBe(true);
+    expect(verifyCompactionContent(before, [tickRow({ sequence: 1 })])).toBe(false);
+    expect(verifyCompactionContent(before, [tickRow({ sequence: 1 }), tickRow({ sequence: 3 })])).toBe(
+      false,
+    );
+  });
+
+  it("compacts real Parquet files with row preservation", async () => {
+    const { connection } = await db();
+    const dir = mkdtempSync(join(tmpdir(), "dt-compact-"));
+    const first = join(dir, "a.parquet");
+    const second = join(dir, "b.parquet");
+    await insertTicks(connection, [tickRow({ sequence: 1 }), tickRow({ sequence: 2 })]);
+    await finalizeParquet(connection, "ticks", first);
+    await insertTicks(connection, [tickRow({ sequence: 3 })]);
+    await finalizeParquet(connection, "ticks", second);
+    const merged = join(dir, "merged.parquet");
+    const proof = await compactParquetFiles(connection, [first, second], merged, (bytes) =>
+      fileSha256(bytes),
+    );
+    expect(proof.rows).toBe(3);
+    expect(proof.sha256).toHaveLength(64);
+    expect(await readParquetCount(connection, merged)).toBe(3);
+  });
+
+  it("reproduces identical passport hashes without frozen timestamps", () => {
+    const base = {
+      datasetId: "ds_repro",
+      collectorSha: "abc123",
+      parserVersion: PROVENANCE.parserVersion,
+      sourceEndpoints: ["wss://api.derivws.com/trading/v1/options/ws/public"],
+      environment: "DEMO",
+      symbols: ["frxEURUSD"],
+      timeRange: { start: "2026-09-18T00:00:00.000Z", end: "2026-09-18T01:00:00.000Z" },
+      files: [{ path: "part-0001.parquet", sha256: "aa", rows: 2 }],
+    };
+    const one = createPassport(base);
+    const two = createPassport(base);
+    expect(one.manifestHash).toBe(two.manifestHash);
+    expect(verifyPassport(one)).toBe(true);
+    expect(verifyPassport(two)).toBe(true);
   });
 
   it("degrades optional capture explicitly under pressure", () => {

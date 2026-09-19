@@ -71,7 +71,7 @@ Observed at smoke time: limits match the documented table above (no discrepancy 
 - `npm install` → green (`ws`, `@types/ws`, `@duckdb/node-api` + bindings; DuckDB `select 1+1` smoke green on Windows, de-risked before building on it)
 - `npm run check:eol` → GREEN; `check:deps` → GREEN (allowlist + self-tests, now 48/48 with research→market-data test refs); `check:cycles` → GREEN
 - `npm run lint` → GREEN after strictness fixes (zod `.loose()`, narrowing helpers, idempotent-cleanup semantics; no rule weakening)
-- `npm run typecheck` → GREEN; `npm run test` → GREEN: 19 files, 64 tests (was 11/23)
+- `npm run typecheck` → GREEN; `npm run test` → GREEN: 21 files, 79 tests (19/64 at review head + correction matrix)
 - `npm run build` → GREEN; web production build → GREEN; trader build → GREEN
 - Trader live smoke (loopback): `/v1/health` HEALTHY/READY/DEMO; `/v1/market/status` DISCONNECTED/0 symbols (honest offline boot); `/v1/scanner/opportunities` empty lattice with shape; `/v1/data/status` idle session with disk thresholds
 - `npm run audit:high` → `found 0 vulnerabilities`; `git diff --check` → clean; `npm run validate` → GREEN
@@ -98,7 +98,7 @@ Observed at smoke time: limits match the documented table above (no discrepancy 
 
 ## 10. Test counts and major scenario coverage
 
-64 tests / 19 files: active_symbols current fields + unknown optionals + legacy fail-closed; contracts_for simplified response; tick/duplicates/gaps/non-monotonic arrival order; req_id correlation + shared socket; timeouts (auto + deterministic sweep); broker error mapping without payload leakage; one external sub → N consumers; exactly-once restore; epoch invalidation; number|string economics; missing economics UNKNOWN; 80% threshold transitions both directions; unsupported expiries; budget reserve/priority/throttle/backoff + telemetry; allow/block narrowing; Parquet roundtrips; Passport stability + sensitivity; DQG all checks; recovery quarantine; compaction verification; capture degradation; boundary tests green; web↛service-internals enforced
+79 tests / 21 files at correction head: review-head matrix plus binary-frame decoding; error-guard + single-count + backoff; resubscribe/recovery; per-symbol DQG; snapshot-driven eligibility; timed capture rolls; disk-stop degrade; content-based compaction; Passport identity reproducibility; full runtime assembly (connect→lattice→capture), probe prove/revoke, cache-key independence, fail-closed lattice; truthful trader endpoints
 
 ## 11. DQG results
 
@@ -113,6 +113,7 @@ Recorded in the final executor report after push; both workflows must be SUCCESS
 - `sharp` allow-scripts install notice (Next toolchain, standard, no action)
 - Vitest `fsModuleCache` performance hint (informational)
 - GitHub Actions runner notices (Node 20 deprecation, ubuntu-26 migration) — pre-existing, unrelated
+- `measureFreeDiskMb` returns null on Windows (statfs unsupported) → warn-level caution, never false confidence; exact thresholds still enforced where measurable (Linux CI)
 - No dependency deviations: all new deps within required lines (`ws` 8.x, `@duckdb/node-api` 1.5.5 line); no second engine; no legacy endpoints anywhere (`ws.derivws.com`/`binaryws.com` absent — verified by construction, only `api.derivws.com` in config/defaults/docs)
 - Test-only `.env` shapes in unit tests use memory/fake transports; no network in CI
 
@@ -130,5 +131,26 @@ Recorded in the final executor report after push; both workflows must be SUCCESS
 - No rate-limit evasion (budgets throttle locally; reserve preserved; backoff bounded)
 - No historical ticks presented as payout evidence (history helper labeled market-evidence-only)
 - Scanner holds no strategy direction logic (eligibility ≠ signal)
-- Package boundaries green (`check:deps` 48/48 self-tests + repo scan); web cannot import service internals (allowlist + eslint)
+- Package boundaries green (`check:deps` self-tests + repo scan); web cannot import service internals (allowlist + eslint)
 - UNRESOLVED_CRITICAL_HIGH: 0
+
+---
+
+## CORRECTION 001 (review head `a84027a`, PR #6)
+
+Root causes: isolated components with no orchestrator (connect stopped at symbols); reconnect restored nothing real; capture utilities unused by any runtime; pulse and source double-charged proposals; error taxonomy off the request path; invented REST hourly window; freshness split across layers; Passport hash included volatile timestamps; compaction proved hash-strings instead of content; live `ws` binary frames undecoded (found by the new runtime smoke, not by fakes).
+
+- F1: `MarketScannerRuntime` (`apps/trader/src/runtime.ts`) drives connect → universe → capabilities → bounded expiry probes (proven/revoked from outcomes) → shared ticks → quote cache → pulse cycles → snapshots → lattice → capture, with `connect/refreshUniverse/probeExpiries/ensureTicks/scannerCycle/captureCycle/restoreAfterReconnect/stop` plus truthful `statusMarket/statusScanner/statusData`
+- F2: socket-close events wire straight to `handleConnectionLost`; hub keeps intended consumers and restores each broker sub exactly once; supervisor restore path refreshes symbols + resubscribes; reconnect invalidation (STALE) is distinct from observed gaps (GAPPED); first post-reconnect tick re-baselines; integration test covers 2-symbol close/restore/recovery
+- F3: runtime-owned `BatchWriter`s feed every live tick/proposal; `CAPTURE_BATCH_ROWS` + timed `CAPTURE_ROLL_MS` rolling; temp-write → validate → atomic rename; per-session Passport manifests; DQG on finalized batches with trust marking; measured disk via `measureFreeDiskMb` with stop-degrade; `/v1/data/status` reports live buffers, partitions, disk and DQG truthfully
+- F4: single-count ownership at the adapter (`source.requestProposal` admits once); scheduler only `peek()`s; test proves N sends == N charges
+- F5: `guard()` on every request path classifies envelopes first (`BrokerRequestError` carries category + code only); rate limits call `recordRateLimited` per group; successes clear episodes per policy; reconnects update telemetry; `SCHEMA_MISMATCH` stays distinct; `SubscribeRejectedError` carries subscribe rejections upstream
+- F6: REST modeled as official 300/min + 1000/10min IP windows (`API_BUDGET_REST_PER_MIN/_PER_10MIN`); authenticated 80/min explicitly deferred; fabricated hourly limit removed
+- F7: `summarizeFreshness` builds per symbol+direction+expiry snapshots (registry/capability/tick/continuity/proposal/epoch/skew/trust → overall); `eligibilityFromSnapshot` consumes the assembled authority
+- F8: identity hash excludes volatile `createdAt` (retained as metadata); test proves two calls with identical inputs hash identically
+- F9: `digestRows` multiset digest + `verifyCompactionContent` on real rows; `compactParquetFiles` merges actual Parquet with row/hash proof
+- Live binary-frame decoding fix in transport with regression test (live-only bug class)
+- Assembled runtime smoke (`scripts/smoke/runtime-smoke.mjs`): PASS 2026-09-19 — 89-symbol universe, 6/6 probes proven, 2 ticks, 6-candidate lattice all ELIGIBLE at 0.954 effective payout, 13 total sends, budget telemetry coherent
+- Deriv docs re-verified at correction start (limits page unchanged: 360/14400 proposal, 220/14400 other, REST 300/min + 1000/10min + auth 80/min)
+- Final tests: 21 files / 79 tests green; full local gate green; clean-worktree lint-first proof below
+- Final head SHA, changed files vs `a84027a`, and CI run IDs: recorded in the final executor report after push

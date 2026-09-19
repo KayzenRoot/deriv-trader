@@ -137,7 +137,7 @@ async function tableCount(connection: DuckDBConnection, table: string): Promise<
  */
 export async function finalizeParquet(
   connection: DuckDBConnection,
-  table: "ticks" | "proposals",
+  table: string,
   finalPath: string,
 ): Promise<string> {
   const expected = await tableCount(connection, table);
@@ -162,6 +162,27 @@ export async function readParquetCount(connection: DuckDBConnection, path: strin
     `SELECT COUNT(*) AS n FROM read_parquet(${sqlString(path)})`,
   );
   return firstCountCell(reader.getRows());
+}
+
+/**
+ * Merge small exploratory Parquet files into one partition file (F9):
+ * union inputs, write temp, validate row preservation, atomic rename.
+ * Returns row count plus the final file hash for evidence.
+ */
+export async function compactParquetFiles(
+  connection: DuckDBConnection,
+  inputs: string[],
+  output: string,
+  fileSha: (bytes: Uint8Array) => string,
+): Promise<{ rows: number; sha256: string }> {
+  if (inputs.length === 0) throw new Error("compaction needs at least one input");
+  const list = inputs.map((p) => sqlString(p)).join(", ");
+  await connection.run("DROP TABLE IF EXISTS compact_src");
+  await connection.run(`CREATE TABLE compact_src AS SELECT * FROM read_parquet([${list}])`);
+  const finalPath = await finalizeParquet(connection, "compact_src", output);
+  const { readFileSync } = await import("node:fs");
+  const rows = await readParquetCount(connection, finalPath);
+  return { rows, sha256: fileSha(readFileSync(finalPath)) };
 }
 
 export async function readParquetTicks(

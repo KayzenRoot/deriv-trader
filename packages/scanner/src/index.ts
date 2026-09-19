@@ -27,7 +27,7 @@ export function ineligible(request: ScanRequest, reason: string): ScanResult {
 
 export { PayoutPulseScheduler, DEFAULT_PULSE_CONFIG } from "./pulse.js";
 export type { PulseBudget, PulseCandidate, PulseConfig, PulsePriority } from "./pulse.js";
-export { evaluateEligibility, buildOpportunity } from "./eligibility.js";
+export { evaluateEligibility, eligibilityFromSnapshot, buildOpportunity } from "./eligibility.js";
 export type {
   EligibilityInput,
   EligibilityResult,
